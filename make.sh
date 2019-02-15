@@ -58,8 +58,8 @@ bash ./configure --with-freetype=system \
                  --with-version-interim="0" \
                  --with-version-update="$VERSION_UPDATE" \
                  --with-version-date="$(date +%Y-%m-%d)" \
-                 --with-zlib=system
-
+                 --with-zlib=system \
+                 --with-jvm-features=zgc
 make CONF=$BUILD_MODE LOG=cmdlines JOBS=8 images
 
 \cp -f /vmfarm/tools/hsdis/8/amd64/hsdis-amd64.so  $NEW_JAVA_HOME/lib/
