@@ -146,6 +146,7 @@ private:
     _exception_cache = NULL;
 
     _scopes_data_begin = (address) _meta->scopes_data_begin();
+    _stack_traversal_mark = 1L;
     _deopt_handler_begin = (address) _code + _meta->deopt_handler_offset();
     _deopt_mh_handler_begin = (address) this;
 
@@ -198,11 +199,15 @@ private:
   virtual bool make_not_entrant() { return make_not_entrant_helper(not_entrant); }
   virtual bool make_not_used() { return make_not_entrant_helper(not_used); }
   virtual address entry_point() const { return _code + _meta->entry_offset(); }
-  virtual bool make_zombie() { ShouldNotReachHere(); return false; }
+  virtual bool make_zombie();
   virtual bool is_osr_method() const { return false; }
   virtual int osr_entry_bci() const { ShouldNotReachHere(); return -1; }
-  // AOT compiled methods do not get into zombie state
-  virtual bool can_convert_to_zombie() { return false; }
+  virtual bool can_convert_to_zombie();
+  // Sweeper support
+  volatile long _stack_traversal_mark;
+  virtual void mark_as_seen_on_stack();
+  long  stack_traversal_mark()                    { return _stack_traversal_mark; }
+  void  set_stack_traversal_mark(long l)          { _stack_traversal_mark = l; }
 
   virtual bool is_evol_dependent_on(Klass* dependee);
   virtual bool is_dependent_on_method(Method* dependee) { return true; }

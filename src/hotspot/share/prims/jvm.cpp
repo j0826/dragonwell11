@@ -3766,3 +3766,52 @@ JVM_END
 JVM_ENTRY_NO_ENV(jint, JVM_FindSignal(const char *name))
   return os::get_signal_number(name);
 JVM_END
+
+/* app aot support
+ * load aot library for app loader
+ */
+JVM_ENTRY(jint, JVM_LoadAOTLibrary(JNIEnv* env, jclass cls, jobject loader, jstring library))
+  JVMWrapper("JVM_LoadAOTLibrary");
+  ResourceMark rm(THREAD);
+  if (!UseAppAOT) {
+    log_warning(aot)("UseAppAOT is disable");
+    return -1;
+  }
+  assert(library != NULL, "app aot library can not be null");
+  char* lib_name = java_lang_String::as_utf8_string(JNIHandles::resolve_non_null(library));
+  assert(lib_name != NULL, "library name can not be empty");
+
+  oop loader_oop = JNIHandles::resolve(loader);
+  if (loader_oop != NULL) {
+    Handle h_loader(THREAD, loader_oop);
+    ClassLoaderData* cld = SystemDictionary::register_loader(h_loader);
+    assert(cld != NULL, "invariant");
+    // TODO: lock class loader data?
+    cld->set_app_aot_lib_name(lib_name);
+    cld->set_app_aot_enabled(true);
+    return cld->try_load_app_aot_library();
+  } else {
+    log_warning(aot)("loader is null");
+    return -1;
+  }
+JVM_END
+
+JVM_ENTRY(jint, JVM_UnloadAOTLibrary(JNIEnv* env, jclass cls, jobject loader))
+  JVMWrapper("JVM_UnloadAOTLibrary");
+  ResourceMark rm(THREAD);
+  if (!UseAppAOT) {
+    log_warning(aot)("UseAppAOT is disable");
+    return -1;
+  }
+  oop loader_oop = JNIHandles::resolve(loader);
+  if (loader_oop != NULL) {
+    Handle h_loader(THREAD, loader_oop);
+    ClassLoaderData* cld = SystemDictionary::register_loader(h_loader);
+    assert(cld != NULL, "invariant");
+    cld->unload_aot_library();
+  } else {
+    log_warning(aot)("loader is null");
+    return -1;
+  }
+  return 0;
+JVM_END

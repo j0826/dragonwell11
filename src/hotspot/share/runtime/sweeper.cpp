@@ -46,6 +46,8 @@
 #include "runtime/vmThread.hpp"
 #include "utilities/events.hpp"
 #include "utilities/xmlstream.hpp"
+#include "aot/aotCompiledMethod.hpp"
+#include "aot/aotLoader.hpp"
 
 #ifdef ASSERT
 
@@ -165,12 +167,20 @@ Monitor* NMethodSweeper::_stat_lock = new Monitor(Mutex::special, "Sweeper::Stat
 class MarkActivationClosure: public CodeBlobClosure {
 public:
   virtual void do_code_blob(CodeBlob* cb) {
-    assert(cb->is_nmethod(), "CodeBlob should be nmethod");
-    nmethod* nm = (nmethod*)cb;
-    nm->set_hotness_counter(NMethodSweeper::hotness_counter_reset_val());
-    // If we see an activation belonging to a non_entrant nmethod, we mark it.
-    if (nm->is_not_entrant()) {
-      nm->mark_as_seen_on_stack();
+    assert(cb->is_nmethod() || cb->is_aot(), "CodeBlob should be nmethod or aot method");
+    if (cb->is_nmethod()) {
+      nmethod* nm = (nmethod*)cb;
+      nm->set_hotness_counter(NMethodSweeper::hotness_counter_reset_val());
+      // If we see an activation belonging to a non_entrant nmethod, we mark it.
+      if (nm->is_not_entrant()) {
+        nm->mark_as_seen_on_stack();
+      }
+    } else {
+      assert(UseAppAOT, "sanity check");
+      AOTCompiledMethod* nm = (AOTCompiledMethod*)cb;
+      if (nm->is_not_entrant()) {
+        nm->mark_as_seen_on_stack();
+      }
     }
   }
 };
@@ -179,6 +189,9 @@ static MarkActivationClosure mark_activation_closure;
 class SetHotnessClosure: public CodeBlobClosure {
 public:
   virtual void do_code_blob(CodeBlob* cb) {
+    if (UseAppAOT && !cb->is_nmethod()) {
+      return;
+    }
     assert(cb->is_nmethod(), "CodeBlob should be nmethod");
     nmethod* nm = (nmethod*)cb;
     nm->set_hotness_counter(NMethodSweeper::hotness_counter_reset_val());
@@ -205,7 +218,7 @@ bool NMethodSweeper::wait_for_stack_scanning() {
 void NMethodSweeper::mark_active_nmethods() {
   CodeBlobClosure* cl = prepare_mark_active_nmethods();
   if (cl != NULL) {
-    Threads::nmethods_do(cl);
+    Threads::nmethods_do(cl); // if UseAppAOT is enabled, nmethods_do will also iterate aot methods
   }
 }
 
@@ -500,6 +513,11 @@ void NMethodSweeper::sweep_code_cache() {
   }
 
   assert(_current.end(), "must have scanned the whole cache");
+  // after sweep, we can remove aot code heap
+  if (UseAppAOT) {
+    // we can unload aot library if non-seen on stack
+    AOTLoader::post_sweep_code_cache();
+  }
 
   const Ticks sweep_end_counter = Ticks::now();
   const Tickspan sweep_time = sweep_end_counter - sweep_start_counter;

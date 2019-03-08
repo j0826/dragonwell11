@@ -23,6 +23,7 @@
  */
 
 #include "precompiled.hpp"
+#include "aot/aotLoader.hpp"
 #include "classfile/classLoaderData.hpp"
 #include "classfile/stringTable.hpp"
 #include "classfile/symbolTable.hpp"
@@ -622,7 +623,11 @@ public:
     if (_nmethod_cl != NULL && thread->is_Java_thread() &&
         ! thread->is_Code_cache_sweeper_thread()) {
       JavaThread* jt = (JavaThread*) thread;
-      jt->nmethods_do(_nmethod_cl);
+      if (!UseAppAOT) {
+        jt->nmethods_do(_nmethod_cl);
+      } else {
+        jt->compiledMethods_do(_nmethod_cl);
+      }
     }
   }
 };

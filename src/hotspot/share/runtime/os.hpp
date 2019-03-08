@@ -634,6 +634,8 @@ class os: AllStatic {
   // same architecture as HotSpot is running on
   // in case of an error NULL is returned and an error message is stored in ebuf
   static void* dll_load(const char *name, char *ebuf, int ebuflen);
+  // AppAOT, shared library will be loaded by multiple loaders
+  static void* dll_mload(const char *name, char *ebuf, int ebuflen);
 
   // lookup symbol in a shared library
   static void* dll_lookup(void* handle, const char* name);

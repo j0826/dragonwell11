@@ -53,7 +53,11 @@ public class AOTInliningPolicy extends GreedyInliningPolicy {
         public static final OptionKey<Integer> AOTInliningSizeMaximum = new OptionKey<>(300);
         @Option(help = "", type = OptionType.Expert)
         public static final OptionKey<Integer> AOTInliningSizeMinimum = new OptionKey<>(50);
+        @Option(help = "Skip special inlinging for AppAOT", type = OptionType.Debug)//
+        public static final OptionKey<Boolean> AOTSkipSpecialInlining = new OptionKey<>(false);
         // @formatter:on
+        @Option(help = "Initialize the declaring class of the method being inlined", type = OptionType.Debug)
+        public static final OptionKey<Boolean> AOTInliningClassInitialization = new OptionKey<>(false);
     }
 
     public AOTInliningPolicy(Map<Invoke, Double> hints) {

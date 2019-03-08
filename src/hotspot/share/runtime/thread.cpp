@@ -2861,6 +2861,18 @@ void JavaThread::nmethods_do(CodeBlobClosure* cf) {
   }
 }
 
+void JavaThread::compiledMethods_do(CodeBlobClosure* cf) {
+  assert((!has_last_Java_frame() && java_call_counter() == 0) ||
+         (has_last_Java_frame() && java_call_counter() > 0), "wrong java_sp info!");
+
+  if (has_last_Java_frame()) {
+    // Traverse the execution stack
+    for (StackFrameStream fst(this); !fst.is_done(); fst.next()) {
+      fst.current()->compiledMethods_do(cf);
+    }
+  }
+}
+
 void JavaThread::metadata_do(void f(Metadata*)) {
   if (has_last_Java_frame()) {
     // Traverse the execution stack to call f() on the methods in the stack
@@ -4482,7 +4494,11 @@ void Threads::nmethods_do(CodeBlobClosure* cf) {
     // on the stack of a Java thread. Ignore the sweeper thread itself to avoid
     // marking CodeCacheSweeperThread::_scanned_compiled_method as active.
     if(!p->is_Code_cache_sweeper_thread()) {
-      p->nmethods_do(cf);
+      if (UseAppAOT) {
+        p->compiledMethods_do(cf);
+      } else {
+        p->nmethods_do(cf);
+      }
     }
   }
 }

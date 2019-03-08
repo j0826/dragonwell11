@@ -1932,6 +1932,16 @@ void * os::dll_load(const char *filename, char *ebuf, int ebuflen) {
   return NULL;
 }
 
+void * os::dll_mload(const char *filename, char *ebuf,
+                     int ebuflen) {
+  void * result = ::dlmopen(LM_ID_NEWLM, filename, RTLD_LAZY);
+  if (result == NULL) {
+    ::strncpy(ebuf, ::dlerror(), ebuflen - 1);
+    ebuf[ebuflen-1] = '\0';
+  }
+  return result;
+}
+
 void * os::Linux::dlopen_helper(const char *filename, char *ebuf,
                                 int ebuflen) {
   void * result = ::dlopen(filename, RTLD_LAZY);

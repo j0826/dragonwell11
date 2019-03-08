@@ -5489,7 +5489,8 @@ InstanceKlass* ClassFileParser::create_instance_klass(bool changed_by_loadhook, 
   assert(_klass == ik, "invariant");
 
   ik->set_has_passed_fingerprint_check(false);
-  if (UseAOT && ik->supers_have_passed_fingerprint_checks()) {
+  if (UseAppAOT /* just check self , TODO:check super classes in other class loader */
+    || UseAOT && ik->supers_have_passed_fingerprint_checks()) {
     uint64_t aot_fp = AOTLoader::get_saved_fingerprint(ik);
     if (aot_fp != 0 && aot_fp == _stream->compute_fingerprint()) {
       // This class matches with a class saved in an AOT library

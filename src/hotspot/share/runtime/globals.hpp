@@ -1971,6 +1971,9 @@ define_pd_global(uint64_t,MaxRAM,                    1ULL*G);
   product(ccstrlist, AOTLibrary, NULL,                                      \
           "AOT library")                                                    \
                                                                             \
+  product(bool, UseAppAOT, false,                                           \
+          "Use AOT for app class loader")                                   \
+                                                                            \
   product(bool, PrintAOT, false,                                            \
           "Print used AOT klasses and methods")                             \
                                                                             \

@@ -27,6 +27,8 @@ package org.graalvm.compiler.phases.common.inlining.walker;
 import static org.graalvm.compiler.core.common.GraalOptions.Intrinsify;
 import static org.graalvm.compiler.core.common.GraalOptions.MaximumRecursiveInlining;
 import static org.graalvm.compiler.core.common.GraalOptions.MegamorphicInliningMinMethodProbability;
+import static org.graalvm.compiler.hotspot.phases.aot.AOTInliningPolicy.Options.AOTInliningClassInitialization;
+import static org.graalvm.compiler.hotspot.phases.aot.AOTInliningPolicy.Options.AOTSkipSpecialInlining;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -149,8 +151,19 @@ public class InliningData {
         } else if (method.isAbstract()) {
             return "it is an abstract method";
         } else if (!method.getDeclaringClass().isInitialized()) {
-            return "the method's class is not initialized";
-        } else if (!method.canBeInlined()) {
+            if (!AOTInliningClassInitialization.getValue(options)) {
+                return "the method's class is not initialized";
+            } else {
+                ResolvedJavaType declClass = method.getDeclaringClass();
+                if (!declClass.isInitialized()) {
+                    declClass.initialize();
+                    if (!declClass.isInitialized()) {
+                        return "the method's class is not initialized";
+                    }
+                }
+            }
+        }
+        if (!method.canBeInlined()) {
             return "it is marked non-inlinable";
         } else if (countRecursiveInlining(method) > MaximumRecursiveInlining.getValue(options)) {
             return "it exceeds the maximum recursive inlining depth";
@@ -188,14 +201,18 @@ public class InliningData {
         }
         MethodCallTargetNode callTarget = (MethodCallTargetNode) invoke.callTarget();
         ResolvedJavaMethod targetMethod = callTarget.targetMethod();
+        ResolvedJavaType holder = targetMethod.getDeclaringClass();
+
+        // skip exact inlining for AppAOT
+        OptionValues options = rootGraph.getOptions();
+        boolean skipSpecialInlining = AOTSkipSpecialInlining.getValue(options);
 
         if (callTarget.invokeKind() == CallTargetNode.InvokeKind.Special || targetMethod.canBeStaticallyBound()) {
-            return getExactInlineInfo(invoke, targetMethod);
+            return skipSpecialInlining ? null : getExactInlineInfo(invoke, targetMethod);
         }
 
         assert callTarget.invokeKind().isIndirect();
 
-        ResolvedJavaType holder = targetMethod.getDeclaringClass();
         if (!(callTarget.receiver().stamp(NodeView.DEFAULT) instanceof ObjectStamp)) {
             return null;
         }
@@ -215,7 +232,7 @@ public class InliningData {
                     assert targetMethod.getDeclaringClass().isAssignableFrom(holder) : holder + " subtype of " + targetMethod.getDeclaringClass() + " for " + targetMethod;
                     ResolvedJavaMethod resolvedMethod = holder.resolveConcreteMethod(targetMethod, contextType);
                     if (resolvedMethod != null) {
-                        return getExactInlineInfo(invoke, resolvedMethod);
+                        return skipSpecialInlining ? null : getExactInlineInfo(invoke, resolvedMethod);
                     }
                 }
             }
@@ -225,7 +242,7 @@ public class InliningData {
             // arrays can be treated as Objects
             ResolvedJavaMethod resolvedMethod = holder.resolveConcreteMethod(targetMethod, contextType);
             if (resolvedMethod != null) {
-                return getExactInlineInfo(invoke, resolvedMethod);
+                return skipSpecialInlining ? null : getExactInlineInfo(invoke, resolvedMethod);
             }
         }
 

@@ -81,6 +81,11 @@
 #include "jfr/jfr.hpp"
 #include "jfr/jfrEvents.hpp"
 #endif
+#if INCLUDE_AOT
+#include "aot/aotCodeHeap.hpp"
+#include "aot/aotLoader.hpp"
+#include "runtime/sweeper.hpp"
+#endif
 
 volatile size_t ClassLoaderDataGraph::_num_array_classes = 0;
 volatile size_t ClassLoaderDataGraph::_num_instance_classes = 0;
@@ -152,6 +157,7 @@ ClassLoaderData::ClassLoaderData(Handle h_class_loader, bool is_anonymous) :
   _claimed(0), _modified_oops(true), _accumulated_modified_oops(false),
   _jmethod_ids(NULL), _handles(), _deallocate_list(NULL),
   _next(NULL),
+  _app_aot_enabled(false), _aot_lib(NULL), _aot_code_heap(NULL), _app_aot_canonical_lib_name(NULL),
   _class_loader_klass(NULL), _name(NULL), _name_and_id(NULL),
   _metaspace_lock(new Mutex(Monitor::leaf+1, "Metaspace allocation lock", true,
                             Monitor::_safepoint_check_never)) {
@@ -764,6 +770,12 @@ ClassLoaderData::~ClassLoaderData() {
   // Delete free list
   if (_deallocate_list != NULL) {
     delete _deallocate_list;
+  }
+
+  // Delete app_aot_lib_name
+  if (_app_aot_canonical_lib_name != NULL) {
+    os::free(_app_aot_canonical_lib_name);
+    _app_aot_canonical_lib_name = NULL;
   }
 }
 
@@ -1551,3 +1563,88 @@ void ClassLoaderDataGraph::print_on(outputStream * const out) {
   }
 }
 #endif // PRODUCT
+
+void ClassLoaderData::set_app_aot_lib_name(char* name) {
+  if (_app_aot_canonical_lib_name != NULL) {
+    // the lib name is set before, warn and ignore
+    return;
+  }
+
+  if (name != NULL && _app_aot_canonical_lib_name == NULL) {
+    encode_aot_lib_name(name);
+  }
+}
+
+// app aot lib name is encoded as "libname|0xaabbccdd",
+// address of loader data is embedded at the tail of canonical name
+char* ClassLoaderData::encode_aot_lib_name(const char *libname) {
+  assert(libname != NULL, "sanity check");
+  int len = strlen(libname)+3+sizeof(intptr_t)*2+1;
+  _app_aot_canonical_lib_name =(char*)os::malloc(len, mtInternal);
+  if (_app_aot_canonical_lib_name != NULL) {
+    os::snprintf(_app_aot_canonical_lib_name, len, "%s|" INTPTR_FORMAT, libname, p2i(this));
+    return _app_aot_canonical_lib_name;
+  } else {
+    return NULL;
+  }
+}
+
+// decode the given canonical lib name and
+// write the real lib path name to the buffer
+// return NULL if canonical_name is not an app aot lib format
+// used by AotLoader::load_library
+char* ClassLoaderData::decode_aot_lib_name(const char* canonical_name, char* buffer, int len) {
+  assert(buffer != NULL && len > 0, "sanity check");
+  if (canonical_name != NULL) {
+    const char* loader_addr = strrchr(canonical_name, '|');
+    if (loader_addr != NULL) {
+      assert(UseAppAOT, "invariant");
+      guarantee(loader_addr - canonical_name < len, "libname is too long for buffer");
+      strncpy(buffer, canonical_name, loader_addr - canonical_name);
+      buffer[loader_addr - canonical_name] = 0;
+      return buffer;
+    } else {
+      return NULL;
+    }
+  }
+  return NULL;
+}
+
+int ClassLoaderData::try_load_app_aot_library() {
+  assert(UseAppAOT, "invariant");
+  if ( app_aot_enabled() && aot_code_heap() == NULL ) {
+    // load aot library
+    ResourceMark rm;
+    log_info(aot, loader)("try to load aot shared library %s", app_aot_lib_name());
+    Klass* loader_klass = this->class_loader_klass();
+    assert(loader_klass != NULL, "sanity check");
+    AOTCodeHeap* heap = AOTLoader::load_app_library(app_aot_lib_name());
+    if (heap != NULL) {
+      set_aot_code_heap(heap);
+      log_info(aot, loader)("aot shared library loaded");
+      return 0;
+    } else {
+      log_warning(aot, loader)("failed load aot shared library, disable AppAOT for loader %s @ " INTPTR_FORMAT,
+                               loader_name(), p2i(this->class_loader_klass()));
+      set_app_aot_enabled(false);
+      return -1;
+    }
+  } else {
+    return 0;
+  }
+}
+
+void ClassLoaderData::unload_aot_library() {
+  if (!UseAppAOT) {
+    return;
+  }
+  if (app_aot_enabled()) {
+    log_info(aot,loader)("Unload aot library for loader " INTPTR_FORMAT, p2i(this));
+    set_app_aot_enabled(false);
+    if (aot_code_heap()) {
+      aot_code_heap()->invalidate_all_methods();
+      // ask sweep to work
+      NMethodSweeper::force_sweep();
+    }
+  }
+}

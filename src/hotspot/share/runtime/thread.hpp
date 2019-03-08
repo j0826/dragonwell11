@@ -1765,6 +1765,7 @@ class JavaThread: public Thread {
 
   // Sweeper operations
   virtual void nmethods_do(CodeBlobClosure* cf);
+  virtual void compiledMethods_do(CodeBlobClosure* cf);
 
   // RedefineClasses Support
   void metadata_do(void f(Metadata*));

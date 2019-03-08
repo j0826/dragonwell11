@@ -1069,6 +1069,21 @@ InstanceKlass* SystemDictionary::resolve_from_stream(Symbol* class_name,
   ObjectLocker ol(lockObject, THREAD, DoObjectLock);
 
   assert(st != NULL, "invariant");
+  if (UseAppAOT && class_loader.not_null()) {
+    ResourceMark rm;
+    const char * source = st->source();
+
+    Klass* loader_klass = class_loader->klass_or_null();
+    assert(!Klass::is_null(loader_klass), "loader klass can not be null");
+    const char *loader_name = loader_klass->external_name();
+
+    log_debug(aot, loader)("defined %s in source location %s by loader %s @" INTPTR_FORMAT,
+                             class_name->as_C_string(), source, loader_name, p2i(loader_klass));
+
+    // try load app aot library, it may fail for example unmatched config
+    // but we can still continue to load class
+    loader_data->try_load_app_aot_library();
+  }
 
   // Parse the stream and create a klass.
   // Note that we do this even though this klass might

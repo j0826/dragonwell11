@@ -41,6 +41,7 @@
 #include "runtime/os.hpp"
 #include "runtime/safepointVerifiers.hpp"
 #include "runtime/sharedRuntime.hpp"
+#include "runtime/sweeper.hpp"
 #include "utilities/xmlstream.hpp"
 
 #include <stdio.h>
@@ -174,6 +175,9 @@ bool AOTCompiledMethod::make_not_entrant_helper(int new_state) {
       return false;
     }
 
+    if (UseAppAOT) {
+      mark_as_seen_on_stack();
+    }
     // Change state
     OrderAccess::storestore();
     *_state_adr = new_state;
@@ -203,6 +207,31 @@ bool AOTCompiledMethod::make_not_entrant_helper(int new_state) {
     tty->print_cr("aot method <" INTPTR_FORMAT "> %s code made %s", p2i(this), this->method() ? this->method()->name_and_sig_as_C_string() : "null", new_state_str);
   }
 
+  return true;
+}
+
+bool AOTCompiledMethod::make_zombie() {
+  assert(!method()->is_old(), "reviving evolved method!");
+  assert(!method()->has_aot_code(), "aot code should be cleared before");
+  guarantee(UseAppAOT, "aot method can only be zombie when enable UseAppAOT");
+  {
+    // Enter critical section.  Does not block for safepoint.
+    MutexLockerEx pl(Patching_lock, Mutex::_no_safepoint_check_flag);
+    if (*_state_adr != not_entrant) {
+      return false;
+    }
+    // Change state
+    OrderAccess::storestore();
+    *_state_adr = zombie;
+
+    // Log the transition once
+    log_state_change();
+  }
+
+  if (TraceCreateZombies) {
+    ResourceMark m;
+    tty->print_cr("aot method <" INTPTR_FORMAT "> %s code made zombie", p2i(this), this->method() ? this->method()->name_and_sig_as_C_string() : "null");
+  }
   return true;
 }
 
@@ -376,6 +405,9 @@ void AOTCompiledMethod::log_state_change() const {
       } else if (*_state_adr == in_use) {
         xtty->begin_elem("make_entrant thread='" UINTX_FORMAT "'",
                          os::current_thread_id());
+      } else if (*_state_adr == zombie) {
+        xtty->begin_elem("make_zombie thread='" UINTX_FORMAT "'",
+                         os::current_thread_id());
       }
       log_identity(xtty);
       xtty->stamp();
@@ -458,3 +490,19 @@ void AOTCompiledMethod::clear_inline_caches() {
     }
   }
 }
+
+// This is a private interface with the sweeper.
+void AOTCompiledMethod::mark_as_seen_on_stack() {
+  assert(UseAppAOT, "sanity check");
+  // Set the traversal mark to ensure that the sweeper does 2
+  // cleaning passes before moving to zombie.
+  set_stack_traversal_mark(NMethodSweeper::traversal_count());
+}
+
+bool AOTCompiledMethod::can_convert_to_zombie() {
+  if (!UseAppAOT) {
+    return false;
+  } else {
+    return is_not_entrant() && stack_traversal_mark() + 1 < NMethodSweeper::traversal_count();
+  }
+};

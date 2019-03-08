@@ -25,3 +25,5 @@ JVM_handle_linux_signal
 numa_error
 numa_warn
 sysThreadAvailableStackWithSlack
+JVM_LoadAOTLibrary
+JVM_UnloadAOTLibrary

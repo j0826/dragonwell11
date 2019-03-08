@@ -2203,7 +2203,7 @@ bool InstanceKlass::should_store_fingerprint(bool is_anonymous) {
     // (2) We are running -Xshare:dump to create a shared archive
     return true;
   }
-  if (UseAOT && is_anonymous) {
+  if ((UseAOT || UseAppAOT) && is_anonymous) {
     // (3) We are using AOT code from a shared library and see an anonymous class
     return true;
   }

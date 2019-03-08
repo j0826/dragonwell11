@@ -382,7 +382,8 @@ int CodeCache::code_heap_compare(CodeHeap* const &lhs, CodeHeap* const &rhs) {
 }
 
 void CodeCache::add_heap(CodeHeap* heap) {
-  assert(!Universe::is_fully_initialized(), "late heap addition?");
+  // AppAOT will add heap after jvm initialization
+  // assert(!Universe::is_fully_initialized(), "late heap addition?");
 
   _heaps->insert_sorted<code_heap_compare>(heap);
 
@@ -395,6 +396,16 @@ void CodeCache::add_heap(CodeHeap* heap) {
   }
   if (code_blob_type_accepts_allocable(type)) {
     _allocable_heaps->insert_sorted<code_heap_compare>(heap);
+  }
+}
+
+void CodeCache::remove_heap(CodeHeap* heap) {
+  assert(heap != NULL && UseAppAOT, "sanity check");
+  _heaps->remove(heap);
+  int type = heap->code_blob_type();
+  guarantee(type == CodeBlobType::AOT, "Only aot heap could be removed");
+  if (code_blob_type_accepts_compiled(type)) {
+    _compiled_heaps->remove(heap);
   }
 }
 

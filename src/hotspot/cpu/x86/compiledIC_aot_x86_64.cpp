@@ -30,7 +30,6 @@
 void CompiledDirectStaticCall::set_to_far(const methodHandle& callee, address entry) {
   address stub = find_stub(true /* is_far */);
   guarantee(stub != NULL, "stub not found");
-
   if (TraceICs) {
     ResourceMark rm;
     tty->print_cr("CompiledDirectStaticCall@" INTPTR_FORMAT ": set_to_far %s",

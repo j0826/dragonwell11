@@ -62,6 +62,8 @@ class ModuleEntryTable;
 class PackageEntryTable;
 class DictionaryEntry;
 class Dictionary;
+class AOTLib;
+class AOTCodeHeap;
 
 // GC root for walking class loader data created
 
@@ -265,6 +267,13 @@ class ClassLoaderData : public CHeapObj<mtClass> {
   // Support for walking class loader data objects
   ClassLoaderData* _next; /// Next loader_datas created
 
+  // AppAOT support
+  bool         _app_aot_enabled;
+  AOTLib*      _aot_lib;
+  AOTCodeHeap* _aot_code_heap;
+  // canonical aot lib name, composed by lib name and CLD address
+  char*        _app_aot_canonical_lib_name;
+
   Klass*  _class_loader_klass;
   Symbol* _name;
   Symbol* _name_and_id;
@@ -287,6 +296,21 @@ class ClassLoaderData : public CHeapObj<mtClass> {
   void accumulate_modified_oops()        { if (has_modified_oops()) _accumulated_modified_oops = true; }
   void clear_accumulated_modified_oops() { _accumulated_modified_oops = false; }
   bool has_accumulated_modified_oops()   { return _accumulated_modified_oops; }
+
+  // AppAOT
+  void set_app_aot_enabled(bool val)        { _app_aot_enabled = val; }
+  bool app_aot_enabled() const              { return _app_aot_enabled; }
+  void set_aot_lib(AOTLib* lib)             { _aot_lib = lib;  }
+  AOTLib* aot_lib() const                   { return _aot_lib; }
+  void set_aot_code_heap(AOTCodeHeap* heap) { _aot_code_heap = heap; }
+  AOTCodeHeap* aot_code_heap() const        { return _aot_code_heap; }
+  void set_app_aot_lib_name(char* name);
+  char* app_aot_lib_name() const            { return _app_aot_canonical_lib_name; }
+  int try_load_app_aot_library();
+
+  // ask loader to unload aot shared library
+  void unload_aot_library();
+
  private:
 
   void unload();
@@ -310,7 +334,10 @@ class ClassLoaderData : public CHeapObj<mtClass> {
   Dictionary* create_dictionary();
 
   void initialize_name(Handle class_loader);
+  char* encode_aot_lib_name(const char* libname);       // convert lib name to internal canonical format
  public:
+  static char* decode_aot_lib_name(const char* canonical_name,
+                                   char* buf, int len); // convert canonical name to real lib name
   // GC interface.
   void clear_claimed() { _claimed = 0; }
   bool claimed() const { return _claimed == 1; }

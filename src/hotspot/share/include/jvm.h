@@ -1194,6 +1194,15 @@ JVM_RawMonitorExit(void *mon);
 JNIEXPORT void* JNICALL
 JVM_GetManagement(jint version);
 
+/* app aot support
+ * load aot library for app loader
+ */
+JNIEXPORT jint JNICALL
+JVM_LoadAOTLibrary(JNIEnv* env, jclass cls, jobject loader, jstring library);
+
+JNIEXPORT jint JNICALL
+JVM_UnloadAOTLibrary(JNIEnv* env, jclass cls, jobject loader);
+
 /*
  * com.sun.tools.attach.VirtualMachine support
  *

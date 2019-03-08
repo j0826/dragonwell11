@@ -46,7 +46,7 @@ void AOTLoader::load_for_klass(InstanceKlass* ik, Thread* thread) {
     // don't even bother
     return;
   }
-  if (UseAOT) {
+  if (UseAOT || UseAppAOT) {
     FOR_ALL_AOT_HEAPS(heap) {
       (*heap)->load_klass_data(ik, thread);
     }
@@ -57,6 +57,22 @@ uint64_t AOTLoader::get_saved_fingerprint(InstanceKlass* ik) {
   if (ik->is_anonymous()) {
     // don't even bother
     return 0;
+  }
+  if (UseAppAOT) {
+    // search code heap from classLoaderData
+    ClassLoaderData* cld = ik->class_loader_data();
+    assert(cld != NULL, "invariant");
+    if (cld != NULL && cld->aot_code_heap() != NULL) {
+      assert(cld->app_aot_enabled(), "invariant");
+      AOTCodeHeap* heap = cld->aot_code_heap();
+      AOTKlassData* klass_data = heap->find_klass(ik);
+      if (klass_data != NULL) {
+        log_debug(aot,fingerprint)("fingerprint of %s is " UINT64_FORMAT, ik->external_name(), klass_data->_fingerprint);
+        return klass_data->_fingerprint;
+      } else {
+        return 0;
+      }
+    }
   }
   FOR_ALL_AOT_HEAPS(heap) {
     AOTKlassData* klass_data = (*heap)->find_klass(ik);
@@ -127,6 +143,9 @@ void AOTLoader::initialize() {
 
   if (FLAG_IS_DEFAULT(UseAOT) && AOTLibrary != NULL) {
     // Don't need to set UseAOT on command line when AOTLibrary is specified
+    FLAG_SET_DEFAULT(UseAOT, true);
+  }
+  if (UseAppAOT) {
     FLAG_SET_DEFAULT(UseAOT, true);
   }
   if (UseAOT) {
@@ -213,7 +232,7 @@ void AOTLoader::universe_init() {
     }
   }
   if (heaps_count() == 0) {
-    if (FLAG_IS_DEFAULT(UseAOT)) {
+    if (!UseAppAOT && FLAG_IS_DEFAULT(UseAOT)) {
       FLAG_SET_DEFAULT(UseAOT, false);
     }
   }
@@ -225,7 +244,11 @@ void AOTLoader::universe_init() {
 
 void AOTLoader::set_narrow_oop_shift() {
   // This method is called from Universe::initialize_heap().
-  if (UseAOT && libraries_count() > 0 &&
+  if (UseAppAOT && UseCompressedOops) {
+    // For AppAOT, copy oop shift value from universe
+    guarantee(Universe::narrow_oop_shift() > 0, "The value narrow_oop_shift must be greater than zero");
+    AOTLib::set_narrow_oop_shift(Universe::narrow_oop_shift());
+  } else if (UseAOT && libraries_count() > 0 &&
       UseCompressedOops && AOTLib::narrow_oop_shift_initialized()) {
     if (Universe::narrow_oop_shift() == 0) {
       // 0 is valid shift value for small heap but we can safely increase it
@@ -237,7 +260,16 @@ void AOTLoader::set_narrow_oop_shift() {
 
 void AOTLoader::set_narrow_klass_shift() {
   // This method is called from Metaspace::set_narrow_klass_base_and_shift().
-  if (UseAOT && libraries_count() > 0 &&
+  if (UseAppAOT && UseCompressedOops && UseCompressedClassPointers) {
+    // For AppAOT, always set narrow_klass_shift to LogKlassAlignmentInBytes
+    // TODO: use a more grace way to set it
+    if (Universe::narrow_klass_shift() != LogKlassAlignmentInBytes) {
+      log_info(aot)("Change narrow klass shift to %d for app aot lib", LogKlassAlignmentInBytes);
+      Universe::set_narrow_klass_shift(LogKlassAlignmentInBytes);
+    }
+    AOTLib::set_narrow_klass_shift(Universe::narrow_klass_shift());
+    AOTLib::set_narrow_oop_shift_initialized(true);
+  } else if (UseAOT && libraries_count() > 0 &&
       UseCompressedOops && AOTLib::narrow_oop_shift_initialized() &&
       UseCompressedClassPointers) {
     if (Universe::narrow_klass_shift() == 0) {
@@ -246,7 +278,7 @@ void AOTLoader::set_narrow_klass_shift() {
   }
 }
 
-void AOTLoader::load_library(const char* name, bool exit_on_error) {
+AOTLib* AOTLoader::load_library(const char* name, bool exit_on_error) {
   // Skip library if a library with the same name is already loaded.
   const int file_separator = *os::file_separator();
   const char* start = strrchr(name, file_separator);
@@ -259,26 +291,52 @@ void AOTLoader::load_library(const char* name, bool exit_on_error) {
       if (PrintAOT) {
         warning("AOT library %s is already loaded as %s.", name, lib_name);
       }
-      return;
+      return NULL;
     }
   }
   char ebuf[1024];
-  void* handle = os::dll_load(name, ebuf, sizeof ebuf);
+  // Support app aot library, the name is encoded as realfilename|0xloadaddr
+  char fname[1024];
+
+  void* handle = NULL;
+  if (ClassLoaderData::decode_aot_lib_name(name, fname, sizeof(fname)) != NULL) {
+    log_debug(aot)("decoded app aot library is %s", fname);
+    handle = os::dll_mload(fname, ebuf, sizeof ebuf);
+  } else {
+    handle = os::dll_load(name, ebuf, sizeof ebuf);
+  }
   if (handle == NULL) {
     if (exit_on_error) {
       tty->print_cr("error opening file: %s", ebuf);
       vm_exit(1);
     }
-    return;
+    return NULL;
   }
-  const int dso_id = libraries_count() + 1;
+  const int dso_id = AOTLib::next_id();
   AOTLib* lib = new AOTLib(handle, name, dso_id);
   if (!lib->is_valid()) {
     delete lib;
     os::dll_unload(handle);
-    return;
+    return NULL;
   }
   add_library(lib);
+  return lib;
+}
+
+AOTCodeHeap * AOTLoader::load_app_library(const char* name) {
+  assert(UseAppAOT, "sanity check");
+
+  AOTLib* lib = load_library(name, true);
+  if (lib != NULL && lib->is_valid()) {
+    AOTCodeHeap* heap = new AOTCodeHeap(lib);
+    {
+      MutexLockerEx mu(CodeCache_lock, Mutex::_no_safepoint_check_flag);
+      add_heap(heap);
+      CodeCache::add_heap(heap);
+    }
+    return heap;
+  }
+  return NULL;
 }
 
 #ifndef PRODUCT
@@ -320,4 +378,46 @@ bool AOTLoader::reconcile_dynamic_invoke(InstanceKlass* holder, int index, Metho
   bool success = caller_heap->reconcile_dynamic_invoke(aot, holder, index, adapter_method, appendix_klass);
   vmassert(success || thread->last_frame().sender(&map).is_deoptimized_frame(), "caller not deoptimized on failure");
   return success;
+}
+
+/* invoked by NMethodSweeper::sweep_code_cache
+ * after mark invalid methods as zombie, we can
+ * safely unload the aot library
+ */
+void AOTLoader::post_sweep_code_cache() {
+  ResourceMark rm;
+
+  GrowableArray<AOTCodeHeap*>* dead_heaps = new(ResourceObj::RESOURCE_AREA, mtInternal) GrowableArray<AOTCodeHeap*> ();
+  assert(UseAppAOT, "sanity check");
+  FOR_ALL_AOT_HEAPS(heap) {
+    if ((*heap)->valid()) {
+      continue;
+    } else {
+      bool live = false;
+      // iterate all aot methods to check they are seen on stack
+      for (int i=0; i < (*heap)->method_count(); i++) {
+        AOTCompiledMethod * aot = (*heap)->method_at(i);
+        if (aot && !aot->is_runtime_stub() && !aot->is_zombie()) {
+          live = true;
+          break;
+        }
+      }
+      if (!live) {
+        dead_heaps->append((*heap));
+      }
+    }
+  }
+
+  for (GrowableArrayIterator<AOTCodeHeap*> it = dead_heaps->begin(); it != dead_heaps->end(); ++it) {
+    AOTCodeHeap* aot_heap = (*it);
+    AOTLib* aot_lib = aot_heap->lib();
+    assert(aot_lib != NULL, "lib should not be null");
+    log_debug(aot)("unload aot heap and shared library %s, no activation on stack", aot_lib->name());
+    os::dll_unload(aot_lib->dl_handle());
+    AOTLoader::_libraries->remove(aot_lib);
+    AOTLoader::_heaps->remove(aot_heap);
+    CodeCache::remove_heap(aot_heap);
+    delete aot_heap;
+  }
+  return;
 }

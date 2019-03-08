@@ -30,6 +30,7 @@
 #include "metaprogramming/isRegisteredEnum.hpp"
 #include "oops/metadata.hpp"
 #include "oops/method.hpp"
+#include "runtime/atomic.hpp"
 
 enum CodeState {
   not_set = 0, // _aot fields is not set yet
@@ -133,6 +134,11 @@ class AOTLib : public CHeapObj<mtCode> {
 public:
   AOTLib(void* handle, const char* name, int dso_id);
   virtual ~AOTLib();
+
+  static void set_narrow_oop_shift(int shift) { _narrow_oop_shift = shift; }
+  static void set_narrow_klass_shift(int shift) { _narrow_klass_shift = shift; }
+  static void set_narrow_oop_shift_initialized(bool val) { _narrow_oop_shift_initialized = val; }
+
   static int  narrow_oop_shift() { return _narrow_oop_shift; }
   static int  narrow_klass_shift() { return _narrow_klass_shift; }
   static bool narrow_oop_shift_initialized() { return _narrow_oop_shift_initialized; }
@@ -160,6 +166,11 @@ public:
   void verify_flag(int  aot_flag, int  flag, const char* name);
 
   address load_symbol(const char *name);
+
+  static int next_id() {
+    static int _id = 0;
+    return Atomic::add(1, &_id);
+  }
 };
 
 
@@ -196,7 +207,10 @@ class AOTCodeHeap : public CodeHeap {
   // Collect stubs info
   int* _stubs_offsets;
 
-  bool _lib_symbols_initialized;
+  volatile bool _lib_symbols_initialized;
+
+  // app aot will invalidate aot code heap
+  bool _valid;
 
   void adjust_boundaries(AOTCompiledMethod* method) {
     char* low = (char*)method->code_begin();
@@ -277,6 +291,15 @@ public:
     return NULL;
   }
 
+  AOTCompiledMethod* method_at(int index) {
+    if (index < _method_count) {
+      AOTCompiledMethod* m = _code_to_aot[index]._aot;
+      assert(_code_to_aot[index]._state != in_use || m != NULL, "AOT method should be set");
+      return m;
+    }
+    return NULL;
+  }
+
   static Method* find_method(Klass* klass, Thread* thread, const char* method_name);
 
   void cleanup_inline_caches();
@@ -286,6 +309,8 @@ public:
   void flush_evol_dependents_on(InstanceKlass* dependee);
 
   void alive_methods_do(void f(CompiledMethod* nm));
+
+  void invalidate_all_methods();
 
 #ifndef PRODUCT
   static int klasses_seen;
@@ -298,6 +323,12 @@ public:
 #endif
 
   bool reconcile_dynamic_invoke(AOTCompiledMethod* caller, InstanceKlass* holder, int index, Method* adapter_method, Klass *appendix_klass);
+
+  // app aot support
+  bool valid() { return _valid; };
+  void set_valid(bool value) { _valid = value; };
+
+  AOTLib* lib() { return _lib; };
 
 private:
   AOTKlassData* find_klass(const char* name);

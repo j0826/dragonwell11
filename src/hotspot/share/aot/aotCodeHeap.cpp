@@ -97,8 +97,15 @@ Klass* AOTCodeHeap::lookup_klass(const char* name, int len, const Method* method
     log_debug(aot, class, resolve)("Probe failed for AOT class %s", name);
     return NULL;
   }
-  Klass* k = SystemDictionary::find_instance_or_array_klass(sym, loader, protection_domain, thread);
-  assert(!thread->has_pending_exception(), "should not throw");
+  Klass* k = NULL;
+  if (UseAppAOT) {
+    /* app aot will load so library after loading klass, try to resolve it */
+    k = SystemDictionary::find_constrained_instance_or_array_klass(sym, loader, thread);
+    guarantee(!thread->has_pending_exception(), "should not throw");
+  } else {
+    k = SystemDictionary::find_instance_or_array_klass(sym, loader, protection_domain, thread);
+    assert(!thread->has_pending_exception(), "should not throw");
+  }
 
   if (k != NULL) {
     log_info(aot, class, resolve)("%s %s (lookup)", caller->method_holder()->external_name(), k->external_name());
@@ -288,6 +295,8 @@ AOTCodeHeap::AOTCodeHeap(AOTLib* lib) :
 
   // Register aot stubs
   register_stubs();
+
+  _valid = true;
 
   if (PrintAOT || (PrintCompilation && PrintAOT)) {
     tty->print("%7d ", (int) tty->time_stamp().milliseconds());
@@ -552,8 +561,6 @@ void AOTCodeHeap::link_os_symbols() {
 
 void AOTCodeHeap::link_global_lib_symbols() {
   if (!_lib_symbols_initialized) {
-    _lib_symbols_initialized = true;
-
     CollectedHeap* heap = Universe::heap();
     SET_AOT_GLOBAL_SYMBOL_VALUE("_aot_card_table_address", address, (BarrierSet::barrier_set()->is_a(BarrierSet::CardTableBarrierSet) ? ci_card_table_address() : NULL));
     SET_AOT_GLOBAL_SYMBOL_VALUE("_aot_heap_top_address", address, (heap->supports_inline_contig_alloc() ? heap->top_addr() : NULL));
@@ -572,6 +579,8 @@ void AOTCodeHeap::link_global_lib_symbols() {
 
     // Link primitive array klasses.
     link_primitive_array_klasses();
+
+    _lib_symbols_initialized = true;
   }
 }
 
@@ -717,11 +726,46 @@ void AOTCodeHeap::sweep_method(AOTCompiledMethod *aot) {
   vmassert(aot->method()->code() != aot TIERED_ONLY( && aot->method()->aot_code() == NULL), "method still active");
 }
 
+void AOTCodeHeap::invalidate_all_methods() {
+  assert(UseAppAOT, "sanity check");
+  if (!valid()) {
+    return;
+  }
+
+  set_valid(false);
+  int marked = 0;
+  for (int i = 0; i < _method_count; ++i) {
+    AOTCompiledMethod* aot = _code_to_aot[i]._aot;
+    if (aot != NULL && !aot->is_runtime_stub()) {
+      // Invalidate aot code.
+      if (Atomic::cmpxchg(invalid, &_code_to_aot[i]._state, not_set) != not_set) {
+        if (_code_to_aot[i]._state == in_use) {
+          aot->mark_for_deoptimization(false);
+          marked++;
+        }
+      }
+    }
+  }
+  log_debug(aot)("deoptimize %d methods in all %d methods", marked, _method_count);
+  if (marked > 0) {
+    VM_Deoptimize op;
+    VMThread::execute(&op);
+  }
+}
 
 bool AOTCodeHeap::load_klass_data(InstanceKlass* ik, Thread* thread) {
   ResourceMark rm;
 
+  if (UseAppAOT) {
+    if (!valid()) {
+      log_trace(aot, class, load)("skip load class %s for invalid heap " INTPTR_FORMAT, ik->internal_name(),
+                                  p2i(this));
+      return false;
+    }
+  }
+
   NOT_PRODUCT( klasses_seen++; )
+  log_trace(aot, class, load)("try to load class %s in heap " INTPTR_FORMAT, ik->internal_name(), p2i(this));
 
   AOTKlassData* klass_data = find_klass(ik);
   if (klass_data == NULL) {
@@ -873,6 +917,11 @@ void AOTCodeHeap::oops_do(OopClosure* f) {
       continue; // Skip uninitialized entries.
     }
     AOTCompiledMethod* aot = _code_to_aot[index]._aot;
+    if ( aot != NULL && aot->is_zombie()) {
+      assert(UseAppAOT, "zombie aot method is only in AppAOT mode");
+      continue; // skip zombie method
+      // TODO: _code_to_aot._state is still in_use, can we invalidate it
+    }
     aot->do_oops(f);
   }
 }

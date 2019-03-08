@@ -776,7 +776,7 @@ jint Universe::initialize_heap() {
     // See needs_explicit_null_check.
     // Only set the heap base for compressed oops because it indicates
     // compressed oops for pstack code.
-    if ((uint64_t)Universe::heap()->reserved_region().end() > UnscaledOopHeapMax) {
+    if (UseAppAOT || (uint64_t)Universe::heap()->reserved_region().end() > UnscaledOopHeapMax) {
       // Didn't reserve heap below 4Gb.  Must shift.
       Universe::set_narrow_oop_shift(LogMinObjAlignmentInBytes);
     }

@@ -133,6 +133,8 @@ class CodeCache : AllStatic {
   static int code_heap_compare(CodeHeap* const &lhs, CodeHeap* const &rhs);
 
   static void add_heap(CodeHeap* heap);
+  // For removing AppAOT heap
+  static void remove_heap(CodeHeap* heap);
   static const GrowableArray<CodeHeap*>* heaps() { return _heaps; }
   static const GrowableArray<CodeHeap*>* compiled_heaps() { return _compiled_heaps; }
   static const GrowableArray<CodeHeap*>* nmethod_heaps() { return _nmethod_heaps; }

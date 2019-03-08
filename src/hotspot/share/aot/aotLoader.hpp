@@ -43,7 +43,6 @@ private:
   static GrowableArray<AOTCodeHeap*>* _heaps;
   static GrowableArray<AOTLib*>* _libraries;
 #endif
-  static void load_library(const char* name, bool exit_on_error);
 
 public:
 #if INCLUDE_AOT
@@ -53,6 +52,9 @@ public:
   static int libraries_count();
   static void add_heap(AOTCodeHeap *heap);
   static void add_library(AOTLib *lib);
+  static AOTLib* load_library(const char* name, bool exit_on_error);
+  static AOTCodeHeap* load_app_library(const char* name);
+  static void post_sweep_code_cache();
 #endif
   static void initialize() NOT_AOT({ FLAG_SET_ERGO(bool, UseAOT, false); });
 
