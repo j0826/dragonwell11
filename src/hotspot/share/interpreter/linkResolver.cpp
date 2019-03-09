@@ -840,15 +840,16 @@ methodHandle LinkResolver::resolve_interface_method(const LinkInfo& link_info, B
   }
 
   // check constant pool tag for called method - must be JVM_CONSTANT_InterfaceMethodref
-  if (!link_info.tag().is_invalid() && !link_info.tag().is_interface_method()) {
-    ResourceMark rm(THREAD);
-    stringStream ss;
-    ss.print("Method '");
-    Method::print_external_name(&ss, link_info.resolved_klass(), link_info.name(), link_info.signature());
-    ss.print("' must be InterfaceMethodref constant");
-    THROW_MSG_NULL(vmSymbols::java_lang_IncompatibleClassChangeError(), ss.as_string());
+  if (!DisableInterfaceMethodrefCheck) {
+    if (!link_info.tag().is_invalid() && !link_info.tag().is_interface_method()) {
+      ResourceMark rm(THREAD);
+      stringStream ss;
+      ss.print("Method '");
+      Method::print_external_name(&ss, link_info.resolved_klass(), link_info.name(), link_info.signature());
+      ss.print("' must be InterfaceMethodref constant");
+      THROW_MSG_NULL(vmSymbols::java_lang_IncompatibleClassChangeError(), ss.as_string());
+    }
   }
-
   // lookup method in this interface or its super, java.lang.Object
   // JDK8: also look for static methods
   methodHandle resolved_method(THREAD, lookup_method_in_klasses(link_info, false, true));

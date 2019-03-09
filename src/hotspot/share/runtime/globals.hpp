@@ -489,6 +489,9 @@ define_pd_global(uint64_t,MaxRAM,                    1ULL*G);
   product(bool, UnlinkSymbolsALot, false,                                   \
           "Unlink unreferenced symbols from the symbol table at safepoints")\
                                                                             \
+  diagnostic(bool, DisableInterfaceMethodrefCheck, false,                   \
+          "Disable JVM_CONSTANT_InterfaceMethodref bytecode check as JDK8") \
+                                                                            \
   notproduct(bool, WalkStackALot, false,                                    \
           "Trace stack (no print) at every exit from the runtime system")   \
                                                                             \
