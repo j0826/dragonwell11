@@ -815,6 +815,29 @@ bool AOTCodeHeap::load_klass_data(InstanceKlass* ik, Thread* thread) {
     _klasses_got[klass_data->_got_index - 1] = ik;
   }
 
+  // With AppAOT, the GOT entry for a super class could be empty if the .so file is loaded after
+  // the super class is initialized. This issue is with classes only because a run-time class 
+  // initilization check is always generated in AOT'ed code for an interface.
+  if (UseAppAOT) {
+    InstanceKlass* super_klass = ik->java_super();
+    while (super_klass != NULL) {
+      AOTKlassData* super_klass_data = find_klass(super_klass);
+      if (super_klass_data == NULL) {
+        break;
+      }
+      int index = super_klass_data->_got_index;
+      if (_klasses_got[index] != NULL) {
+        break;
+      }
+      _klasses_got[index] = super_klass;
+      // All super classes have already been initialized when a class is being initialized.
+      guarantee(super_klass->is_initialized(), "super class should be initialized");
+      _klasses_got[index - 1] = super_klass;
+
+      super_klass = super_klass->java_super();
+    }
+  }
+
   // Initialize global symbols of the DSO to the corresponding VM symbol values.
   link_global_lib_symbols();
 

@@ -39,7 +39,7 @@ JAOTC=${TESTJAVA}${FS}bin${FS}jaotc
 TEST_CLASS=TmpTestAppAOT
 TEST_SOURCE=${TEST_CLASS}.java
 SUB_DIR=sub
-TEST_SUB_CLASS=TestException
+TEST_SUB_CLASS=Test
 TEST_SUB_SOURCE=${TEST_SUB_CLASS}.java
 AOT_LIB=test.so
 
@@ -66,7 +66,7 @@ public class TmpTestAppAOT{
         AotLoader ucl = new AotLoader(urls);
         int loaded = AppAOTController.loadAOTLibraryForLoader(ucl, "./test.so");
         if (loaded != 0) throw new Exception("failed to load aot library");
-        Class<?> c1 = ucl.loadClass("TestException");
+        Class<?> c1 = ucl.loadClass("Test");
         Constructor<?> conc = c1.getConstructor();
         Object obj = conc.newInstance();
     }
@@ -86,10 +86,19 @@ rm -rf ${SUB_DIR}
 mkdir ${SUB_DIR}
 
 cat > ${TESTCLASSES}${FS}${SUB_DIR}${FS}$TEST_SUB_SOURCE << EOF
-public class TestException extends Exception {
-    public TestException() {
+public class Test implements Itfc {
+    public Test() {
+        doSth();
     }
 }
+interface Itfc {
+    static Dummy field = new Dummy();
+
+    default public void doSth() {
+        Dummy v = field;
+    }
+}
+class Dummy {}
 EOF
 
 # Do compilation
@@ -109,7 +118,7 @@ fi
 
 # Do jaotc compilation
 echo "aot compilation"
-${JAOTC} --output ${AOT_LIB} -J-Dgraal.PrintCompilation=true --verbose -J-cp -J${SUB_DIR} -J-Dgraal.AOTSkipSpecialInlining=false ${TEST_SUB_CLASS}.class > aotc.log
+${JAOTC} --output ${AOT_LIB} -J-Dgraal.PrintCompilation=true --verbose -J-cp -J${SUB_DIR} -J-Dgraal.AOTSkipSpecialInlining=false -J-Dgraal.AOTInliningClassInitialization=true ${TEST_SUB_CLASS}.class > aotc.log
 if [ $? != '0' ]
 then
 	printf "Failed to aot compile ${SUB_DIR}${FS}${TEST_SUB_SOURCE}.class"
@@ -136,7 +145,7 @@ function check_output()
   # check aot lib is loaded
   echo "check aot lib"
   lib_load_mesg=`grep "test.so" output.txt|grep "loaded"|wc -l`
-  
+
   if [[ $lib_load_mesg -ne 1 ]]; then
     echo "aot lib is not loaded"
     exit -1
@@ -144,9 +153,9 @@ function check_output()
 
   # check aot method is executed
   echo "check aot method"
-  aot_method_messages=`grep "TestException.<init>" output.txt|grep aot|wc -l`
+  aot_method_messages=`grep "Test.<init>" output.txt|grep aot|wc -l`
   if [[ $aot_method_messages -ne 1 ]]; then
-    echo "aot method TestException.<init> is not executed"
+    echo "aot method Test.<init> is not executed"
     exit -1
   fi
 
