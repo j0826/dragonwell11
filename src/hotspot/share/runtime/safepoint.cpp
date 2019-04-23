@@ -150,12 +150,28 @@ static const int safepoint_spin_before_yield = 2000;
 static volatile int PageArmed = 0 ;        // safepoint polling page is RO|RW vs PROT_NONE
 static volatile int TryingToBlock = 0 ;    // proximate value -- for advisory use only
 static bool timeout_error_printed = false;
+volatile bool SafepointSynchronize::_should_clear_nmethods = false;
+volatile bool SafepointSynchronize::_is_at_full_gc_pause = false;
+
+static void clear_seen_on_stack(CodeBlob* cb) {
+  assert(TenantThreadStop && SafepointSynchronize::is_at_safepoint(), "pre-condition");
+  if (cb != NULL && cb->is_nmethod()) {
+    nmethod* nm = (nmethod*)cb;
+    nm->set_seen_on_stack(false);
+  }
+}
+
 
 // Roll all threads forward to a safepoint and suspend them all
 void SafepointSynchronize::begin() {
   EventSafepointBegin begin_event;
   Thread* myThread = Thread::current();
   assert(myThread->is_VM_thread(), "Only VM thread may execute a safepoint");
+
+  if (TenantThreadStop) {
+    set_should_clear_nmethods(false);
+    set_at_full_gc_pause(false);
+  }
 
   if (PrintSafepointStatistics || PrintSafepointStatisticsTimeout > 0) {
     _safepoint_begin_time = os::javaTimeNanos();
@@ -484,6 +500,10 @@ void SafepointSynchronize::begin() {
     }
   }
 
+  if (TenantThreadStop) {
+    CodeCache::blobs_do(clear_seen_on_stack);
+  }
+
   if (PrintSafepointStatistics) {
     // Record how much time spend on the above cleanup tasks
     update_statistics_on_cleanup_end(os::javaTimeNanos());
@@ -493,6 +513,21 @@ void SafepointSynchronize::begin() {
     post_safepoint_begin_event(&begin_event, nof_threads, _current_jni_active_count);
   }
 }
+
+class MakeNMethodNotEntrantClosure : public CodeBlobClosure {
+ public:
+  void do_code_blob(CodeBlob* cb) {
+    assert(TenantThreadStop && SafepointSynchronize::is_at_safepoint(), "pre-condition");
+    if (cb != NULL && cb->is_nmethod()) {
+      nmethod* nm = (nmethod*)cb;
+      if (!nm->is_locked_by_vm() && nm->is_in_use()
+          && nm->is_eagerly_retired_by_dead_classes()) {
+        assert(!nm->is_native_method(), "just checking");
+        nm->make_not_entrant();
+      }
+    }
+  }
+};
 
 // Wake up all threads, so they are ready to resume execution after the safepoint
 // operation has been carried out
@@ -529,6 +564,11 @@ void SafepointSynchronize::end() {
       // Make polling safepoint aware
       os::make_polling_page_readable();
       PageArmed = 0 ;
+    }
+
+    if (TenantThreadStop && should_clear_nmethods()) {
+      MakeNMethodNotEntrantClosure cl;
+      CodeCache::blobs_do(&cl);
     }
 
     if (SafepointMechanism::uses_global_page_poll()) {

@@ -51,6 +51,20 @@ void check_ThreadShadow() {
 
 void ThreadShadow::set_pending_exception(oop exception, const char* file, int line) {
   assert(exception != NULL && oopDesc::is_oop(exception), "invalid exception oop");
+
+  if (MultiTenant && TenantThreadStop && ((Thread*)this)->is_Java_thread()) {
+    JavaThread* thread = (JavaThread*)this;
+    if (thread->is_marked_for_tenant_shutdown()
+        && !thread->is_tenant_shutdown_masked()
+        && _pending_exception != Universe::tenant_death_exception()) {
+      thread->clear_tenant_death_exception();
+      _pending_exception = Universe::tenant_death_exception();
+      _exception_file = file;
+      _exception_line = line;
+      return;
+    }
+  }
+
   _pending_exception = exception;
   _exception_file    = file;
   _exception_line    = line;

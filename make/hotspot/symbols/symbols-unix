@@ -192,3 +192,15 @@ JVM_AddModuleExportsToAllUnnamed
 JVM_AddReadsModule
 JVM_DefineModule
 JVM_SetBootLoaderUnnamedModule
+
+# Multi-tenant support
+JVM_CurrentTenant
+JVM_TenantPrepareForDestroy
+JVM_AttachToTenant
+JVM_DetachFromTenant
+JVM_InterruptTenantThread
+JVM_IsKilledByTenant
+JVM_WakeUpTenantThread
+JVM_MaskTenantShutdown
+JVM_UnmaskTenantShutdown
+JVM_DumpTenantThreadStacks

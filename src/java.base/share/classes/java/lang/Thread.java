@@ -37,7 +37,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.locks.LockSupport;
 
+import com.alibaba.tenant.TenantContainer;
+import com.alibaba.tenant.TenantDeathException;
+import com.alibaba.tenant.TenantGlobals;
+import jdk.internal.misc.SharedSecrets;
 import jdk.internal.misc.TerminatingThreadLocal;
+import jdk.internal.misc.VM;
 import sun.nio.ch.Interruptible;
 import jdk.internal.reflect.CallerSensitive;
 import jdk.internal.reflect.Reflection;
@@ -213,6 +218,18 @@ class Thread implements Runnable {
      * Java thread status for tools, default indicates thread 'not yet started'
      */
     private volatile int threadStatus;
+
+    /**
+     * The tenant container which creates this thread object
+     */
+    TenantContainer inheritedTenantContainer;
+
+    /*
+     * indicates whether child thread created by this thread should
+     * inherit TenantContainer of this thread.
+     * The value is "true" to keep compatible with AJDK versions <= 8.4.7
+     */
+    boolean tenantInheritance = true;
 
     /**
      * The argument supplied to the current call to
@@ -445,14 +462,31 @@ class Thread implements Runnable {
                 acc != null ? acc : AccessController.getContext();
         this.target = target;
         setPriority(priority);
-        if (inheritThreadLocals && parent.inheritableThreadLocals != null)
-            this.inheritableThreadLocals =
-                ThreadLocal.createInheritedMap(parent.inheritableThreadLocals);
+        if (inheritThreadLocals && parent.inheritableThreadLocals != null) {
+            //
+            // For non-ROOT tenant's thread running ROOT code, just clear inheritableThreadLocals to avoid
+            // ROOT-to-nonROOT reference, other scenarios are generally safe:
+            //
+            if (isCallingFromNonRootTenantToRoot()) {
+                this.inheritableThreadLocals = null;
+            } else {
+                this.inheritableThreadLocals =
+                        ThreadLocal.createInheritedMap(parent.inheritableThreadLocals);
+            }
+        }
         /* Stash the specified stack size in case the VM cares */
         this.stackSize = stackSize;
 
         /* Set thread ID */
         this.tid = nextThreadID();
+
+        /* Set the tenant container */
+        if (VM.isBooted() && TenantGlobals.isTenantEnabled()) {
+            tenantInheritance = SharedSecrets.getTenantAccess().threadInheritance();
+            if (Thread.currentThread().tenantInheritance) {
+                inheritedTenantContainer = TenantContainer.current();
+            }
+        }
     }
 
     /**
@@ -855,6 +889,8 @@ class Thread implements Runnable {
         inheritedAccessControlContext = null;
         blocker = null;
         uncaughtExceptionHandler = null;
+        inheritedTenantContainer = null;
+        contextClassLoader = null;
     }
 
     /**
@@ -1998,7 +2034,11 @@ class Thread implements Runnable {
      * intended to be called only by the JVM.
      */
     private void dispatchUncaughtException(Throwable e) {
-        getUncaughtExceptionHandler().uncaughtException(this, e);
+        if (!(e instanceof TenantDeathException)
+                || (TenantGlobals.isThreadStopEnabled() && "true".equalsIgnoreCase(
+                        System.getProperty("com.alibaba.tenant.AllowDispatchingTenantDeathException")))) {
+            getUncaughtExceptionHandler().uncaughtException(this, e);
+        }
     }
 
     /**
@@ -2089,4 +2129,24 @@ class Thread implements Runnable {
     private native void resume0();
     private native void interrupt0();
     private native void setNativeName(String name);
+
+    /*
+     * Returns true if current thread was created in ROOT tenant and is now running non-ROOT tenant code,
+     * otherwise false.
+     */
+    static boolean isCallingFromRootTenantToNonRoot() {
+        return VM.isBooted() && TenantGlobals.isDataIsolationEnabled()
+                && TenantContainer.current() != null
+                && Thread.currentThread().inheritedTenantContainer == null;
+    }
+
+    /*
+     * Returns true if current thread was created in non-ROOT tenant and is now running ROOT tenant code,
+     * otherwise false.
+     */
+    static boolean isCallingFromNonRootTenantToRoot() {
+        return VM.isBooted() && TenantGlobals.isDataIsolationEnabled()
+                && TenantContainer.current() == null
+                && Thread.currentThread().inheritedTenantContainer != null;
+    }
 }

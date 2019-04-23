@@ -3218,6 +3218,25 @@ FastLockNode* GraphKit::shared_lock(Node* obj) {
   if (stopped())                // Dead monitor?
     return NULL;
 
+  if (MultiTenant && TenantThreadStop) {
+    IdealKit ideal(this, true);
+    Node* tls = ideal.thread();
+    Node* no_base = ideal.top();
+    const int mark_offset = in_bytes(JavaThread::tenant_shutdown_mark_offset());
+    Node* mark_addr = ideal.AddP(no_base, tls, ideal.ConX(mark_offset));
+    Node* mark_val = ideal.load(ideal.ctrl(), mark_addr, TypeInt::BYTE, T_BYTE, Compile::AliasIdxRaw);
+    Node*   zero = ideal.ConI(0);
+    // The tenant stop flag is checked here.
+    // If the flag is true, a SEGV is triggered by visiting an illegal page.
+    // Signal hanler catches the SEGV and convert to a pending exception.
+    ideal.if_then(mark_val, BoolTest::ne, zero) ; {
+      address no_touch_page_addr = TenantStopRecorder::no_touch_page();
+      Node* no_touch_page = makecon(TypeRawPtr::make(no_touch_page_addr));
+      ideal.store(ideal.ctrl(), no_touch_page, zero, T_BYTE, Compile::AliasIdxRaw, MemNode::release);
+    } ideal.end_if();
+    final_sync(ideal);
+  }
+
   assert(dead_locals_are_killed(), "should kill locals before sync. point");
 
   // Box the stack location

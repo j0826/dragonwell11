@@ -65,6 +65,29 @@
 #define BIND(label) bind(label); BLOCK_COMMENT(#label ":")
 const int MXCSR_MASK = 0xFFC0;  // Mask out any pending exceptions
 
+static address handle_tenant_stop_exception() {
+  assert(MultiTenant && TenantThreadStop, "pre-condition");
+  JavaThread* thread = JavaThread::current();
+  address pc = thread->saved_exception_pc();
+  // pc is the instruction which we must emulate
+  // doing a no-op is fine:  return garbage from the load
+  // therefore, compute npc
+  address npc = Assembler::locate_next_instruction(pc);
+  // should not receive tenant_death_exception
+  //  when tenant_shutdown is masked
+  if (!thread->is_tenant_shutdown_masked()) {
+    if (thread->has_last_Java_frame()) {
+      oop exc_oop = Universe::tenant_death_exception();
+      thread->set_pending_exception(exc_oop, __FILE__, __LINE__);
+    } else {
+      // request an async exception
+      thread->set_tenant_death_exception();
+    }
+  }
+  // return address of next instruction to execute
+  return npc;
+}
+
 // Stub Code definitions
 
 class StubGenerator: public StubCodeGenerator {
@@ -974,6 +997,73 @@ class StubGenerator: public StubCodeGenerator {
 
     __ emit_data64( mask, relocInfo::none );
     __ emit_data64( mask, relocInfo::none );
+
+    return start;
+  }
+
+  address generate_handler_for_tenant_stop_exception() {
+    StubCodeMark mark(this, "StubRoutines", "handler_for_tenant_stop_exception");
+    address start = __ pc();
+    __ push(0);                       // hole for return address-to-be
+    __ pusha();                       // push registers
+    Address next_pc(rsp, RegisterImpl::number_of_registers * BytesPerWord);
+    __ subptr(rsp, frame::arg_reg_save_area_bytes);
+    BLOCK_COMMENT("call handle_tenant_stop_exception");
+    __ call(RuntimeAddress(CAST_FROM_FN_PTR(address, handle_tenant_stop_exception)));
+    __ addptr(rsp, frame::arg_reg_save_area_bytes);
+    __ movptr(next_pc, rax);          // stuff next address
+    __ popa();
+    __ ret(0);                        // jump to next address
+    return start;
+  }
+
+  address generate_vector_fp_mask(const char *stub_name, int64_t mask) {
+    __ align(CodeEntryAlignment);
+    StubCodeMark mark(this, "StubRoutines", stub_name);
+    address start = __ pc();
+
+    __ emit_data64(mask, relocInfo::none);
+    __ emit_data64(mask, relocInfo::none);
+    __ emit_data64(mask, relocInfo::none);
+    __ emit_data64(mask, relocInfo::none);
+    __ emit_data64(mask, relocInfo::none);
+    __ emit_data64(mask, relocInfo::none);
+    __ emit_data64(mask, relocInfo::none);
+    __ emit_data64(mask, relocInfo::none);
+
+    return start;
+  }
+
+  address generate_vector_custom_i32(const char *stub_name, Assembler::AvxVectorLen len,
+                                     int32_t val0, int32_t val1, int32_t val2, int32_t val3,
+                                     int32_t val4 = 0, int32_t val5 = 0, int32_t val6 = 0, int32_t val7 = 0,
+                                     int32_t val8 = 0, int32_t val9 = 0, int32_t val10 = 0, int32_t val11 = 0,
+                                     int32_t val12 = 0, int32_t val13 = 0, int32_t val14 = 0, int32_t val15 = 0) {
+    __ align(CodeEntryAlignment);
+    StubCodeMark mark(this, "StubRoutines", stub_name);
+    address start = __ pc();
+
+    assert(len != Assembler::AVX_NoVec, "vector len must be specified");
+    __ emit_data(val0, relocInfo::none, 0);
+    __ emit_data(val1, relocInfo::none, 0);
+    __ emit_data(val2, relocInfo::none, 0);
+    __ emit_data(val3, relocInfo::none, 0);
+    if (len >= Assembler::AVX_256bit) {
+      __ emit_data(val4, relocInfo::none, 0);
+      __ emit_data(val5, relocInfo::none, 0);
+      __ emit_data(val6, relocInfo::none, 0);
+      __ emit_data(val7, relocInfo::none, 0);
+      if (len >= Assembler::AVX_512bit) {
+        __ emit_data(val8, relocInfo::none, 0);
+        __ emit_data(val9, relocInfo::none, 0);
+        __ emit_data(val10, relocInfo::none, 0);
+        __ emit_data(val11, relocInfo::none, 0);
+        __ emit_data(val12, relocInfo::none, 0);
+        __ emit_data(val13, relocInfo::none, 0);
+        __ emit_data(val14, relocInfo::none, 0);
+        __ emit_data(val15, relocInfo::none, 0);
+      }
+    }
 
     return start;
   }
@@ -5601,6 +5691,9 @@ address generate_cipherBlockChaining_decryptVectorAESCrypt() {
     StubRoutines::_atomic_add_entry           = generate_atomic_add();
     StubRoutines::_atomic_add_long_entry      = generate_atomic_add_long();
     StubRoutines::_fence_entry                = generate_orderaccess_fence();
+
+    StubRoutines::_handler_for_tenant_stop_exception_entry =
+      generate_handler_for_tenant_stop_exception();
 
     // platform dependent
     StubRoutines::x86::_get_previous_fp_entry = generate_get_previous_fp();

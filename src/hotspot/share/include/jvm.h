@@ -1228,6 +1228,43 @@ JVM_GetTemporaryDirectory(JNIEnv *env);
 JNIEXPORT jobjectArray JNICALL
 JVM_GetEnclosingMethodInfo(JNIEnv* env, jclass ofClass);
 
+/*
+ * com.alibaba.tenant.TenantContainer
+ */
+JNIEXPORT jobject JNICALL
+JVM_CurrentTenant(JNIEnv *env, jclass tenantContainerClass);
+
+JNIEXPORT void JNICALL
+JVM_AttachToTenant(JNIEnv *env, jobject tenant);
+
+JNIEXPORT void JNICALL
+JVM_DetachFromTenant(JNIEnv *env, jobject tenant);
+
+JNIEXPORT void JNICALL
+JVM_TenantPrepareForDestroy(JNIEnv* env, jobject tenant, jboolean osWakeUp);
+
+JNIEXPORT jboolean JNICALL
+JVM_IsKilledByTenant(JNIEnv*env, jclass ignored, jobject jthread);
+
+JNIEXPORT void JNICALL
+JVM_WakeUpTenantThread(JNIEnv *env, jclass clazz, jobject jthread);
+
+JNIEXPORT void JNICALL
+JVM_MaskTenantShutdown(JNIEnv *env, jclass ignored);
+
+JNIEXPORT void JNICALL
+JVM_UnmaskTenantShutdown(JNIEnv *env, jclass ignored);
+
+JNIEXPORT void JNICALL
+JVM_DumpTenantThreadStacks(JNIEnv *env, jclass tenant, jobjectArray threads);
+
+JNIEXPORT void JNICALL
+JVM_InterruptTenantThread(JNIEnv *env, jclass ignored, jobject jthread);
+
+JNIEXPORT long JNICALL
+JVM_GetTenantOccupiedMemory(JNIEnv *env, jobject tenant);
+
+
 /* =========================================================================
  * The following defines a private JVM interface that the JDK can query
  * for the JVM version and capabilities.  sun.misc.Version defines

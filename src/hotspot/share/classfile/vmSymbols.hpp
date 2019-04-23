@@ -82,6 +82,150 @@
   template(java_lang_Integer_IntegerCache,            "java/lang/Integer$IntegerCache")           \
   template(java_lang_Long,                            "java/lang/Long")                           \
   template(java_lang_Long_LongCache,                  "java/lang/Long$LongCache")                 \
+  template(com_alibaba_tenant_TenantGlobals,          "com/alibaba/tenant/TenantGlobals")         \
+  template(com_alibaba_tenant_TenantConfiguration,    "com/alibaba/tenant/TenantConfiguration")   \
+  template(com_alibaba_tenant_TenantState,            "com/alibaba/tenant/TenantState")           \
+  template(com_alibaba_tenant_TenantException,        "com/alibaba/tenant/TenantException")       \
+  template(com_alibaba_tenant_TenantDeathException,   "com/alibaba/tenant/TenantDeathException")  \
+  template(com_alibaba_tenant_TenantContainer,        "com/alibaba/tenant/TenantContainer")       \
+  template(com_alibaba_tenant_JGroup,                 "com/alibaba/tenant/JGroup")                \
+  template(jdk_panama_vector_VectorIntrinsics,        "jdk/panama/vector/VectorIntrinsics")         \
+  template(jdk_panama_vector_Vector,                  "jdk/panama/vector/Vector")                   \
+  template(jdk_panama_vector_VectorSpecies,           "jdk/panama/vector/Vector$Species")           \
+  template(jdk_panama_vector_VectorMask,              "jdk/panama/vector/Vector$Mask")              \
+  template(jdk_panama_vector_VectorAbstractMask,      "jdk/panama/vector/AbstractMask")             \
+  template(jdk_panama_vector_FloatVector,             "jdk/panama/vector/FloatVector")              \
+  template(jdk_panama_vector_FloatVector_FloatSpecies,"jdk/panama/vector/FloatVector$FloatSpecies") \
+  template(jdk_panama_vector_Float64Vector,          "jdk/panama/vector/Float64Vector")                             \
+  template(jdk_panama_vector_Float64Vector_Float64Species,"jdk/panama/vector/Float64Vector$Float64Species")         \
+  template(jdk_panama_vector_Float64Vector_Float64Mask,"jdk/panama/vector/Float64Vector$Float64Mask")               \
+  template(jdk_panama_vector_Float64Vector_Float64Shuffle,"jdk/panama/vector/Float64Vector$Float64Shuffle")         \
+  template(jdk_panama_vector_Float128Vector,          "jdk/panama/vector/Float128Vector")                           \
+  template(jdk_panama_vector_Float128Vector_Float128Species,"jdk/panama/vector/Float128Vector$Float128Species")     \
+  template(jdk_panama_vector_Float128Vector_Float128Mask,"jdk/panama/vector/Float128Vector$Float128Mask")           \
+  template(jdk_panama_vector_Float128Vector_Float128Shuffle,"jdk/panama/vector/Float128Vector$Float128Shuffle")     \
+  template(jdk_panama_vector_Float256Vector,          "jdk/panama/vector/Float256Vector")                           \
+  template(jdk_panama_vector_Float256Vector_Float256Species,"jdk/panama/vector/Float256Vector$Float256Species")     \
+  template(jdk_panama_vector_Float256Vector_Float256Mask,"jdk/panama/vector/Float256Vector$Float256Mask")           \
+  template(jdk_panama_vector_Float256Vector_Float256Shuffle,"jdk/panama/vector/Float256Vector$Float256Shuffle")     \
+  template(jdk_panama_vector_Float512Vector,          "jdk/panama/vector/Float512Vector")                           \
+  template(jdk_panama_vector_Float512Vector_Float512Species,"jdk/panama/vector/Float512Vector$Float512Species")     \
+  template(jdk_panama_vector_Float512Vector_Float512Mask,"jdk/panama/vector/Float512Vector$Float512Mask")           \
+  template(jdk_panama_vector_Float512Vector_Float512Shuffle,"jdk/panama/vector/Float512Vector$Float512Shuffle")     \
+  template(jdk_panama_vector_FloatMaxVector,          "jdk/panama/vector/FloatMaxVector")                 \
+  template(jdk_panama_vector_FloatMaxVector_FloatMaxSpecies,"jdk/panama/vector/FloatMaxVector$FloatMaxSpecies")     \
+  template(jdk_panama_vector_FloatMaxVector_FloatMaxMask,"jdk/panama/vector/FloatMaxVector$FloatMaxMask")           \
+  template(jdk_panama_vector_FloatMaxVector_FloatMaxShuffle,"jdk/panama/vector/FloatMaxVector$FloatMaxShuffle")     \
+  template(jdk_panama_vector_DoubleVector,             "jdk/panama/vector/DoubleVector")                            \
+  template(jdk_panama_vector_DoubleVector_DoubleSpecies,"jdk/panama/vector/DoubleVector$DoubleSpecies")             \
+  template(jdk_panama_vector_Double64Vector,             "jdk/panama/vector/Double64Vector")                        \
+  template(jdk_panama_vector_Double64Vector_Double64Species,"jdk/panama/vector/Double64Vector$Double64Species")     \
+  template(jdk_panama_vector_Double64Vector_Double64Mask,"jdk/panama/vector/Double64Vector$Double64Mask")           \
+  template(jdk_panama_vector_Double64Vector_Double64Shuffle,"jdk/panama/vector/Double64Vector$Double64Shuffle")     \
+  template(jdk_panama_vector_Double128Vector,             "jdk/panama/vector/Double128Vector")                      \
+  template(jdk_panama_vector_Double128Vector_Double128Species,"jdk/panama/vector/Double128Vector$Double128Species") \
+  template(jdk_panama_vector_Double128Vector_Double128Mask,"jdk/panama/vector/Double128Vector$Double128Mask")       \
+  template(jdk_panama_vector_Double128Vector_Double128Shuffle,"jdk/panama/vector/Double128Vector$Double128Shuffle") \
+  template(jdk_panama_vector_Double256Vector,             "jdk/panama/vector/Double256Vector")                      \
+  template(jdk_panama_vector_Double256Vector_Double256Species,"jdk/panama/vector/Double256Vector$Double256Species") \
+  template(jdk_panama_vector_Double256Vector_Double256Mask,"jdk/panama/vector/Double256Vector$Double256Mask")       \
+  template(jdk_panama_vector_Double256Vector_Double256Shuffle,"jdk/panama/vector/Double256Vector$Double256Shuffle") \
+  template(jdk_panama_vector_Double512Vector,             "jdk/panama/vector/Double512Vector")                      \
+  template(jdk_panama_vector_Double512Vector_Double512Species,"jdk/panama/vector/Double512Vector$Double512Species") \
+  template(jdk_panama_vector_Double512Vector_Double512Mask,"jdk/panama/vector/Double512Vector$Double512Mask")       \
+  template(jdk_panama_vector_Double512Vector_Double512Shuffle,"jdk/panama/vector/Double512Vector$Double512Shuffle") \
+  template(jdk_panama_vector_DoubleMaxVector,             "jdk/panama/vector/DoubleMaxVector")            \
+  template(jdk_panama_vector_DoubleMaxVector_DoubleMaxSpecies,"jdk/panama/vector/DoubleMaxVector$DoubleMaxSpecies")     \
+  template(jdk_panama_vector_DoubleMaxVector_DoubleMaxMask,"jdk/panama/vector/DoubleMaxVector$DoubleMaxMask")           \
+  template(jdk_panama_vector_DoubleMaxVector_DoubleMaxShuffle,"jdk/panama/vector/DoubleMaxVector$DoubleMaxShuffle")     \
+  template(jdk_panama_vector_LongVector,               "jdk/panama/vector/LongVector")                        \
+  template(jdk_panama_vector_LongVector_LongSpecies,    "jdk/panama/vector/LongVector$LongSpecies")           \
+  template(jdk_panama_vector_Long64Vector,            "jdk/panama/vector/Long64Vector")                       \
+  template(jdk_panama_vector_Long64Vector_Long64Species,"jdk/panama/vector/Long64Vector$Long64Species")       \
+  template(jdk_panama_vector_Long64Vector_Long64Mask,"jdk/panama/vector/Long64Vector$Long64Mask")             \
+  template(jdk_panama_vector_Long64Vector_Long64Shuffle,"jdk/panama/vector/Long64Vector$Long64Shuffle")       \
+  template(jdk_panama_vector_Long128Vector,            "jdk/panama/vector/Long128Vector")                     \
+  template(jdk_panama_vector_Long128Vector_Long128Species,"jdk/panama/vector/Long128Vector$Long128Species")   \
+  template(jdk_panama_vector_Long128Vector_Long128Mask,"jdk/panama/vector/Long128Vector$Long128Mask")         \
+  template(jdk_panama_vector_Long128Vector_Long128Shuffle,"jdk/panama/vector/Long128Vector$Long128Shuffle")   \
+  template(jdk_panama_vector_Long256Vector,            "jdk/panama/vector/Long256Vector")                     \
+  template(jdk_panama_vector_Long256Vector_Long256Species,"jdk/panama/vector/Long256Vector$Long256Species")   \
+  template(jdk_panama_vector_Long256Vector_Long256Mask,"jdk/panama/vector/Long256Vector$Long256Mask")         \
+  template(jdk_panama_vector_Long256Vector_Long256Shuffle,"jdk/panama/vector/Long256Vector$Long256Shuffle")   \
+  template(jdk_panama_vector_Long512Vector,            "jdk/panama/vector/Long512Vector")                     \
+  template(jdk_panama_vector_Long512Vector_Long512Species,"jdk/panama/vector/Long512Vector$Long512Species")   \
+  template(jdk_panama_vector_Long512Vector_Long512Mask,"jdk/panama/vector/Long512Vector$Long512Mask")         \
+  template(jdk_panama_vector_Long512Vector_Long512Shuffle,"jdk/panama/vector/Long512Vector$Long512Shuffle")   \
+  template(jdk_panama_vector_LongMaxVector,            "jdk/panama/vector/LongMaxVector")           \
+  template(jdk_panama_vector_LongMaxVector_LongMaxSpecies,"jdk/panama/vector/LongMaxVector$LongMaxSpecies")   \
+  template(jdk_panama_vector_LongMaxVector_LongMaxMask,"jdk/panama/vector/LongMaxVector$LongMaxMask")         \
+  template(jdk_panama_vector_LongMaxVector_LongMaxShuffle,"jdk/panama/vector/LongMaxVector$LongMaxShuffle")   \
+  template(jdk_panama_vector_IntVector,               "jdk/panama/vector/IntVector")                          \
+  template(jdk_panama_vector_IntVector_IntSpecies,    "jdk/panama/vector/IntVector$IntSpecies")               \
+  template(jdk_panama_vector_Int64Vector,            "jdk/panama/vector/Int64Vector")                         \
+  template(jdk_panama_vector_Int64Vector_Int64Species,"jdk/panama/vector/Int64Vector$Int64Species")           \
+  template(jdk_panama_vector_Int64Vector_Int64Mask,"jdk/panama/vector/Int64Vector$Int64Mask")                 \
+  template(jdk_panama_vector_Int64Vector_Int64Shuffle,"jdk/panama/vector/Int64Vector$Int64Shuffle")           \
+  template(jdk_panama_vector_Int128Vector,            "jdk/panama/vector/Int128Vector")                       \
+  template(jdk_panama_vector_Int128Vector_Int128Species,"jdk/panama/vector/Int128Vector$Int128Species")       \
+  template(jdk_panama_vector_Int128Vector_Int128Mask,"jdk/panama/vector/Int128Vector$Int128Mask")             \
+  template(jdk_panama_vector_Int128Vector_Int128Shuffle,"jdk/panama/vector/Int128Vector$Int128Shuffle")       \
+  template(jdk_panama_vector_Int256Vector,            "jdk/panama/vector/Int256Vector")                       \
+  template(jdk_panama_vector_Int256Vector_Int256Species,"jdk/panama/vector/Int256Vector$Int256Species")       \
+  template(jdk_panama_vector_Int256Vector_Int256Mask,"jdk/panama/vector/Int256Vector$Int256Mask")             \
+  template(jdk_panama_vector_Int256Vector_Int256Shuffle,"jdk/panama/vector/Int256Vector$Int256Shuffle")       \
+  template(jdk_panama_vector_Int512Vector,            "jdk/panama/vector/Int512Vector")                       \
+  template(jdk_panama_vector_Int512Vector_Int512Species,"jdk/panama/vector/Int512Vector$Int512Species")       \
+  template(jdk_panama_vector_Int512Vector_Int512Mask,"jdk/panama/vector/Int512Vector$Int512Mask")             \
+  template(jdk_panama_vector_Int512Vector_Int512Shuffle,"jdk/panama/vector/Int512Vector$Int512Shuffle")       \
+  template(jdk_panama_vector_IntMaxVector,            "jdk/panama/vector/IntMaxVector")             \
+  template(jdk_panama_vector_IntMaxVector_IntMaxSpecies,"jdk/panama/vector/IntMaxVector$IntMaxSpecies")       \
+  template(jdk_panama_vector_IntMaxVector_IntMaxMask,"jdk/panama/vector/IntMaxVector$IntMaxMask")             \
+  template(jdk_panama_vector_IntMaxVector_IntMaxShuffle,"jdk/panama/vector/IntMaxVector$IntMaxShuffle")       \
+  template(jdk_panama_vector_ByteVector,               "jdk/panama/vector/ByteVector")                        \
+  template(jdk_panama_vector_ByteVector_ByteSpecies,    "jdk/panama/vector/ByteVector$ByteSpecies")           \
+  template(jdk_panama_vector_Byte64Vector,            "jdk/panama/vector/Byte64Vector")                       \
+  template(jdk_panama_vector_Byte64Vector_Byte64Species,"jdk/panama/vector/Byte64Vector$Byte64Species")       \
+  template(jdk_panama_vector_Byte64Vector_Byte64Mask,"jdk/panama/vector/Byte64Vector$Byte64Mask")             \
+  template(jdk_panama_vector_Byte64Vector_Byte64Shuffle,"jdk/panama/vector/Byte64Vector$Byte64Shuffle")       \
+  template(jdk_panama_vector_Byte128Vector,            "jdk/panama/vector/Byte128Vector")                     \
+  template(jdk_panama_vector_Byte128Vector_Byte128Species,"jdk/panama/vector/Byte128Vector$Byte128Species")   \
+  template(jdk_panama_vector_Byte128Vector_Byte128Mask,"jdk/panama/vector/Byte128Vector$Byte128Mask")         \
+  template(jdk_panama_vector_Byte128Vector_Byte128Shuffle,"jdk/panama/vector/Byte128Vector$Byte128Shuffle")   \
+  template(jdk_panama_vector_Byte256Vector,            "jdk/panama/vector/Byte256Vector")                     \
+  template(jdk_panama_vector_Byte256Vector_Byte256Species,"jdk/panama/vector/Byte256Vector$Byte256Species")   \
+  template(jdk_panama_vector_Byte256Vector_Byte256Mask,"jdk/panama/vector/Byte256Vector$Byte256Mask")         \
+  template(jdk_panama_vector_Byte256Vector_Byte256Shuffle,"jdk/panama/vector/Byte256Vector$Byte256Shuffle")   \
+  template(jdk_panama_vector_Byte512Vector,            "jdk/panama/vector/Byte512Vector")                     \
+  template(jdk_panama_vector_Byte512Vector_Byte512Species,"jdk/panama/vector/Byte512Vector$Byte512Species")   \
+  template(jdk_panama_vector_Byte512Vector_Byte512Mask,"jdk/panama/vector/Byte512Vector$Byte512Mask")         \
+  template(jdk_panama_vector_Byte512Vector_Byte512Shuffle,"jdk/panama/vector/Byte512Vector$Byte512Shuffle")   \
+  template(jdk_panama_vector_ByteMaxVector,            "jdk/panama/vector/ByteMaxVector")           \
+  template(jdk_panama_vector_ByteMaxVector_ByteMaxSpecies,"jdk/panama/vector/ByteMaxVector$ByteMaxSpecies")   \
+  template(jdk_panama_vector_ByteMaxVector_ByteMaxMask,"jdk/panama/vector/ByteMaxVector$ByteMaxMask")         \
+  template(jdk_panama_vector_ByteMaxVector_ByteMaxShuffle,"jdk/panama/vector/ByteMaxVector$ByteMaxShuffle")   \
+  template(jdk_panama_vector_ShortVector,               "jdk/panama/vector/ShortVector")                        \
+  template(jdk_panama_vector_ShortVector_ShortSpecies,    "jdk/panama/vector/ShortVector$ShortSpecies")         \
+  template(jdk_panama_vector_Short64Vector,            "jdk/panama/vector/Short64Vector")                       \
+  template(jdk_panama_vector_Short64Vector_Short64Species,"jdk/panama/vector/Short64Vector$Short64Species")     \
+  template(jdk_panama_vector_Short64Vector_Short64Mask,"jdk/panama/vector/Short64Vector$Short64Mask")           \
+  template(jdk_panama_vector_Short64Vector_Short64Shuffle,"jdk/panama/vector/Short64Vector$Short64Shuffle")     \
+  template(jdk_panama_vector_Short128Vector,            "jdk/panama/vector/Short128Vector")                     \
+  template(jdk_panama_vector_Short128Vector_Short128Species,"jdk/panama/vector/Short128Vector$Short128Species") \
+  template(jdk_panama_vector_Short128Vector_Short128Mask,"jdk/panama/vector/Short128Vector$Short128Mask")       \
+  template(jdk_panama_vector_Short128Vector_Short128Shuffle,"jdk/panama/vector/Short128Vector$Short128Shuffle") \
+  template(jdk_panama_vector_Short256Vector,            "jdk/panama/vector/Short256Vector")                     \
+  template(jdk_panama_vector_Short256Vector_Short256Species,"jdk/panama/vector/Short256Vector$Short256Species") \
+  template(jdk_panama_vector_Short256Vector_Short256Mask,"jdk/panama/vector/Short256Vector$Short256Mask")       \
+  template(jdk_panama_vector_Short256Vector_Short256Shuffle,"jdk/panama/vector/Short256Vector$Short256Shuffle") \
+  template(jdk_panama_vector_Short512Vector,            "jdk/panama/vector/Short512Vector")                     \
+  template(jdk_panama_vector_Short512Vector_Short512Species,"jdk/panama/vector/Short512Vector$Short512Species") \
+  template(jdk_panama_vector_Short512Vector_Short512Mask,"jdk/panama/vector/Short512Vector$Short512Mask")       \
+  template(jdk_panama_vector_Short512Vector_Short512Shuffle,"jdk/panama/vector/Short512Vector$Short512Shuffle") \
+  template(jdk_panama_vector_ShortMaxVector,            "jdk/panama/vector/ShortMaxVector")           \
+  template(jdk_panama_vector_ShortMaxVector_ShortMaxSpecies,"jdk/panama/vector/ShortMaxVector$ShortMaxSpecies") \
+  template(jdk_panama_vector_ShortMaxVector_ShortMaxMask,"jdk/panama/vector/ShortMaxVector$ShortMaxMask")       \
+  template(jdk_panama_vector_ShortMaxVector_ShortMaxShuffle,"jdk/panama/vector/ShortMaxVector$ShortMaxShuffle") \
   template(java_lang_Shutdown,                        "java/lang/Shutdown")                       \
   template(java_lang_ref_Reference,                   "java/lang/ref/Reference")                  \
   template(java_lang_ref_SoftReference,               "java/lang/ref/SoftReference")              \
@@ -348,6 +492,7 @@
   template(group_name,                                "group")                                    \
   template(daemon_name,                               "daemon")                                   \
   template(run_method_name,                           "run")                                      \
+  template(runThread_method_name,                     "runThread")                                \
   template(exit_method_name,                          "exit")                                     \
   template(add_method_name,                           "add")                                      \
   template(remove_method_name,                        "remove")                                   \
@@ -444,6 +589,8 @@
   template(module_entry_name,                         "module_entry")                             \
   template(resolved_references_name,                  "<resolved_references>")                    \
   template(init_lock_name,                            "<init_lock>")                              \
+  template(inheritedTenantContainer_name,             "inheritedTenantContainer")                 \
+  template(initializeTenantContainerClass_name,       "initializeTenantContainerClass")           \
                                                                                                   \
   /* name symbols needed by intrinsics */                                                         \
   VM_INTRINSICS_DO(VM_INTRINSIC_IGNORE, VM_SYMBOL_IGNORE, template, VM_SYMBOL_IGNORE, VM_ALIAS_IGNORE) \
@@ -549,6 +696,8 @@
   template(int_String_signature,                      "(I)Ljava/lang/String;")                                    \
   template(boolean_boolean_int_signature,             "(ZZ)I")                                                    \
   template(codesource_permissioncollection_signature, "(Ljava/security/CodeSource;Ljava/security/PermissionCollection;)V") \
+  template(tenantcontainer_signature,                 "Lcom/alibaba/tenant/TenantContainer;")                     \
+  template(com_alibaba_tenant_TenantState_signature,   "Lcom/alibaba/tenant/TenantState;")                        \
   /* signature symbols needed by intrinsics */                                                                    \
   VM_INTRINSICS_DO(VM_INTRINSIC_IGNORE, VM_SYMBOL_IGNORE, VM_SYMBOL_IGNORE, template, VM_ALIAS_IGNORE)            \
                                                                                                                   \

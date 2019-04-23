@@ -63,3 +63,30 @@ void MarkingCodeBlobClosure::do_code_blob(CodeBlob* cb) {
     do_nmethod(nm);
   }
 }
+
+bool IsTenantClassLoaderAlive::do_object_b(oop obj) {
+  assert(TenantThreadStop && SafepointSynchronize::is_at_safepoint(), "pre-condition");
+  if (obj != NULL) {
+    oop loader_obj = NULL;
+    if (obj->klass_or_null() != NULL && obj->is_instance()) {
+      HandleMark hm;
+      if (obj->is_a(SystemDictionary::Class_klass())) {
+        loader_obj = java_lang_Class::class_loader(obj);
+        if (loader_obj == NULL) {
+          return true; // bootstrap classloader
+        }
+      } else if (obj->is_a(SystemDictionary::ProtectionDomain_klass())) {
+        loader_obj = java_security_ProtectionDomain::class_loader(Handle(Thread::current(), obj));
+      } else if (obj->klass()->id() == InstanceClassLoaderKlassID) {
+        loader_obj = obj;
+      }
+    }
+
+    if (loader_obj != NULL && java_lang_ClassLoader::is_dead(loader_obj)) {
+      _found_any = true;
+      return false;
+    }
+  }
+  // alive by default
+  return true;
+}

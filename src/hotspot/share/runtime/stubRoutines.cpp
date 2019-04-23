@@ -71,6 +71,8 @@ address StubRoutines::_fence_entry                              = NULL;
 address StubRoutines::_d2i_wrapper                              = NULL;
 address StubRoutines::_d2l_wrapper                              = NULL;
 
+address StubRoutines::_handler_for_tenant_stop_exception_entry = NULL;
+
 jint    StubRoutines::_fpu_cntrl_wrd_std                        = 0;
 jint    StubRoutines::_fpu_cntrl_wrd_24                         = 0;
 jint    StubRoutines::_fpu_cntrl_wrd_64                         = 0;

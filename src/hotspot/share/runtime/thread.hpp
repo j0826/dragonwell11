@@ -31,6 +31,7 @@
 #include "memory/allocation.hpp"
 #include "oops/oop.hpp"
 #include "prims/jvmtiExport.hpp"
+#include "tenantenv.h"
 #include "runtime/frame.hpp"
 #include "runtime/globals.hpp"
 #include "runtime/handshake.hpp"
@@ -876,6 +877,7 @@ class JavaThread: public Thread {
   JavaThread*    _next;                          // The next thread in the Threads list
   bool           _on_thread_list;                // Is set when this JavaThread is added to the Threads list
   oop            _threadObj;                     // The Java level thread object
+  oop            _tenantObj;                     // The tenant object which this java thread attaches to
 
 #ifdef ASSERT
  private:
@@ -904,6 +906,8 @@ class JavaThread: public Thread {
   ThreadFunction _entry_point;
 
   JNIEnv        _jni_environment;
+
+  TenantEnv     _tenant_environment;             //  tenant environment
 
   // Deopt support
   DeoptResourceMark*  _deopt_mark;               // Holds special ResourceMark for deoptimization
@@ -1116,6 +1120,10 @@ class JavaThread: public Thread {
     return (struct JNINativeInterface_ *)_jni_environment.functions;
   }
 
+  void set_tenant_functions(struct TenantNativeInterface_* functionTable) {
+    _tenant_environment.functions = functionTable;
+  }
+
   // This function is called at thread creation to allow
   // platform specific thread variables to be initialized.
   void cache_global_variables();
@@ -1144,6 +1152,11 @@ class JavaThread: public Thread {
   // (or for threads attached via JNI)
   oop threadObj() const                          { return _threadObj; }
   void set_threadObj(oop p)                      { _threadObj = p; }
+
+  // Get the tenant which the thread is attached to
+  oop tenantObj() const                          { return _tenantObj; }
+  //Set the tenant object for current thread
+  void set_tenantObj(oop tenantObj);
 
   ThreadPriority java_priority() const;          // Read from threadObj()
 
@@ -1694,6 +1707,9 @@ class JavaThread: public Thread {
   // Returns the jni environment for this thread
   JNIEnv* jni_environment()                      { return &_jni_environment; }
 
+  // Returns the tenant environment for this thread
+  TenantEnv* tenant_environment()                { return &_tenant_environment; }
+
   static JavaThread* thread_from_jni_environment(JNIEnv* env) {
     JavaThread *thread_from_jni_env = (JavaThread*)((intptr_t)env - in_bytes(jni_environment_offset()));
     // Only return NULL if thread is off the thread list; starting to
@@ -1995,6 +2011,60 @@ class JavaThread: public Thread {
   bool is_attaching_via_jni() const { return _jni_attach_state == _attaching_via_jni; }
   bool has_attached_via_jni() const { return is_attaching_via_jni() || _jni_attach_state == _attached_via_jni; }
   inline void set_done_attaching_via_jni();
+
+private:
+  // TSM (Tenant-Shutdown-Mark) type
+  enum TSMType {
+    TSM_uninitialized = -1,  // uninitialized state
+    TSM_being_killed  = 0,   // external killing operation is in progress,
+                             // cannot disable tenant shutdown from current thread, have to spin
+
+    TSM_idle,                // no tenant shutdown related operations in progress,
+                             // thread is ready to either do external shutdown or disable shutdown by itself.
+
+    TSM_marked_begin,        // all values >= TSM_marked_begin means tenant shutdown
+                             // has been disabled for this thread; recursive disabling & restoring are allowed
+  };
+
+  volatile int _tenant_shutdown_mark_level;  // must be value of TSMType; atomic operations are employed to access
+
+  volatile bool _marked_for_tenant_shutdown; // indicates if this java thread has been marked by TenantContainer.destroy()
+
+  // disable/enable tenant shutdown from external threads, must be used in pairs
+  void disable_tenant_shutdown();
+  void enable_tenant_shutdown();
+
+public:
+  static ByteSize tenant_shutdown_mark_offset()        { return byte_offset_of(JavaThread, _marked_for_tenant_shutdown); }
+  bool is_marked_for_tenant_shutdown();
+  void mark_for_tenant_shutdown();
+
+  // to operate on TenantDeathException
+  bool has_tenant_death_exception();
+  void set_tenant_death_exception();
+  void clear_tenant_death_exception();
+
+  // mask a thread to prevent tenant shutdown operation
+  void mask_tenant_shutdown();
+  void unmask_tenant_shutdown();
+  bool is_tenant_shutdown_masked();
+
+  //
+  // mask_tenant_shutdown/unmask_tenant_shutdown are only allowed to be called
+  // by current thread, which is used to guarantee that the 'critical code block',
+  // likes <clinit> MUST NOT be interleaved with tenant shutdown operation,
+  // otherwise it might cause undefined behavior.
+  //
+  // Generally, killer thread uses following pattern to guard the mutual exclusion
+  // between tenant shutdown operation and 'critical code block'.
+  //
+  // if (java_thread->try_start_tenant_shutdown()) {
+  //   ... ... // short shutdown operation
+  //   end_tenant_shutdown();
+  // }
+  //
+  bool try_start_tenant_shutdown();  // returns true if OK to do tenant shutdown operation, otherwise false
+  void end_tenant_shutdown();
 };
 
 // Inline implementation of JavaThread::current
@@ -2212,6 +2282,12 @@ class Threads: AllStatic {
 
   // Deoptimizes all frames tied to marked nmethods
   static void deoptimized_wrt_marked_nmethods();
+
+  // Create a VM operation to kill all threads of a particular tenant
+  static void kill_threads_of_tenant(oop tenant_obj, jboolean os_wake_up);
+
+  // Mark threads for tenant termination
+  static void mark_threads_for_tenant_shutdown(oop tenant_obj, bool os_wake_up);
 };
 
 
@@ -2235,5 +2311,33 @@ class SignalHandlerMark: public StackObj {
   }
 };
 
+// Mark the thread to prevent it from being killed by TenantContainer.destroy()
+// Can be used recursively
+class TenantShutdownMark  {
+private:
+  JavaThread*   _thread;              // for now, only JavaThread
+
+public:
+  TenantShutdownMark(Thread* thread);
+  ~TenantShutdownMark();
+};
+
+class TenantStopRecorder: public AllStatic {
+private:
+  static address               _no_touch_page;
+public:
+  static void    set_no_touch_page(address addr)
+  {
+    _no_touch_page = addr;
+  }
+  static address no_touch_page()
+  {
+    return _no_touch_page;
+  }
+  static bool    is_no_touch_address(address addr)
+  {
+    return addr >= _no_touch_page && addr < (_no_touch_page + os::vm_page_size());
+  }
+};
 
 #endif // SHARE_VM_RUNTIME_THREAD_HPP

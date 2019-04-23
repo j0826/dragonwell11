@@ -55,6 +55,9 @@ import java.util.stream.Collectors;
 import static java.util.stream.Collectors.toMap;
 import java.util.stream.Stream;
 import javax.management.JMX;
+
+import com.alibaba.tenant.TenantContainer;
+import com.alibaba.tenant.TenantGlobals;
 import sun.management.Util;
 import sun.management.spi.PlatformMBeanProvider;
 import sun.management.spi.PlatformMBeanProvider.PlatformComponent;
@@ -479,15 +482,30 @@ public class ManagementFactory {
             sm.checkPermission(perm);
         }
 
-        if (platformMBeanServer == null) {
-            platformMBeanServer = MBeanServerFactory.createMBeanServer();
-            platformComponents()
-                    .stream()
-                    .filter(PlatformComponent::shouldRegister)
-                    .flatMap(pc -> pc.nameToMBeanMap().entrySet().stream())
-                    .forEach(entry -> addMXBean(platformMBeanServer, entry.getKey(), entry.getValue()));
+        if(TenantGlobals.isDataIsolationEnabled() && null != TenantContainer.current()) {
+            return TenantContainer.current().getFieldValue(ManagementFactory.class,
+                    "platformMBeanServer",
+                    ()->{
+                        MBeanServer server = MBeanServerFactory.createMBeanServer();
+                        platformComponents()
+                                .stream()
+                                .filter(PlatformComponent::shouldRegister)
+                                .flatMap(pc -> pc.nameToMBeanMap().entrySet().stream())
+                                .forEach(entry -> addMXBean(server, entry.getKey(), entry.getValue()));
+                        return server;
+                    });
+        } else {
+            //use the value in root.
+            if (platformMBeanServer == null) {
+                platformMBeanServer = MBeanServerFactory.createMBeanServer();
+                platformComponents()
+                        .stream()
+                        .filter(PlatformComponent::shouldRegister)
+                        .flatMap(pc -> pc.nameToMBeanMap().entrySet().stream())
+                        .forEach(entry -> addMXBean(platformMBeanServer, entry.getKey(), entry.getValue()));
+            }
+            return platformMBeanServer;
         }
-        return platformMBeanServer;
     }
 
     /**

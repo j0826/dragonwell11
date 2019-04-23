@@ -59,6 +59,8 @@ import java.util.function.Supplier;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
+import com.alibaba.tenant.TenantContainer;
+import com.alibaba.tenant.TenantGlobals;
 import jdk.internal.loader.BuiltinClassLoader;
 import jdk.internal.perf.PerfCounter;
 import jdk.internal.loader.BootLoader;
@@ -241,6 +243,9 @@ public abstract class ClassLoader {
     // must be added *after* it.
     private final ClassLoader parent;
 
+    // if this classloader will never be used again; the field is directly accessed by VM
+    private boolean isDead;
+
     // class loader name
     private final String name;
 
@@ -249,6 +254,12 @@ public abstract class ClassLoader {
 
     // a string for exception message printing
     private final String nameAndId;
+
+    // Dispose current classLoader and will never use it again, caller code must guarrentee that!
+    void dispose() {
+        assert TenantGlobals.isTenantEnabled();
+        isDead = true;
+    }
 
     /**
      * Encapsulates the set of parallel capable loader types.
@@ -386,6 +397,13 @@ public abstract class ClassLoader {
             assertionLock = this;
         }
         this.nameAndId = nameAndId(this);
+
+        if (TenantGlobals.isThreadStopEnabled()) {
+            TenantContainer tenant = TenantContainer.current();
+            if (tenant != null) {
+                tenant.addTenantClassLoader(this);
+            }
+        }
     }
 
     /**
@@ -565,6 +583,7 @@ public abstract class ClassLoader {
     protected Class<?> loadClass(String name, boolean resolve)
         throws ClassNotFoundException
     {
+        checkDead();
         synchronized (getClassLoadingLock(name)) {
             // First, check if the class has already been loaded
             Class<?> c = findLoadedClass(name);
@@ -1011,6 +1030,7 @@ public abstract class ClassLoader {
                                          ProtectionDomain protectionDomain)
         throws ClassFormatError
     {
+        checkDead();
         protectionDomain = preDefineClass(name, protectionDomain);
         String source = defineClassSourceLocation(protectionDomain);
         Class<?> c = defineClass1(this, name, b, off, len, protectionDomain, source);
@@ -1389,6 +1409,7 @@ public abstract class ClassLoader {
      * @spec JPMS
      */
     public URL getResource(String name) {
+        checkDead();
         Objects.requireNonNull(name);
         URL url;
         if (parent != null) {
@@ -1456,6 +1477,7 @@ public abstract class ClassLoader {
      */
     public Enumeration<URL> getResources(String name) throws IOException {
         Objects.requireNonNull(name);
+        checkDead();
         @SuppressWarnings("unchecked")
         Enumeration<URL>[] tmp = (Enumeration<URL>[]) new Enumeration<?>[2];
         if (parent != null) {
@@ -1733,6 +1755,7 @@ public abstract class ClassLoader {
      */
     public InputStream getResourceAsStream(String name) {
         Objects.requireNonNull(name);
+        checkDead();
         URL url = getResource(name);
         try {
             return url != null ? url.openStream() : null;
@@ -2194,6 +2217,7 @@ public abstract class ClassLoader {
                                     String implVendor, URL sealBase)
     {
         Objects.requireNonNull(name);
+        checkDead();
 
         // definePackage is not final and may be overridden by custom class loader
         Package p = new Package(name, specTitle, specVersion, specVendor,
@@ -2964,6 +2988,13 @@ public abstract class ClassLoader {
                                        directives.packageEnabled[i]);
 
         defaultAssertionStatus = directives.deflt;
+    }
+
+    private void checkDead() {
+        if (TenantGlobals.isThreadStopEnabled() && isDead) {
+            System.err.println("[ERROR] Illegal access of dead ClassLoader objects, thread=" + Thread.currentThread());
+            throw new IllegalStateException("should not use a dead ClassLoader");
+        }
     }
 
     // Retrieves the assertion directives from the VM.

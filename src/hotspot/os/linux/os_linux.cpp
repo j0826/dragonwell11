@@ -4452,6 +4452,30 @@ static void SR_handler(int sig, siginfo_t* siginfo, ucontext_t* context) {
   errno = old_errno;
 }
 
+// Signal to unblock thread
+static int SIG_WAKE_UP = (__SIGRTMAX - 2);
+
+static void on_sig_wake_up(int sig) { /* no action */ }
+
+// Set up signal handler for awakened thread
+static int sig_wake_up_init() {
+    sigset_t sigset;
+    struct sigaction sa;
+
+    sa.sa_handler = on_sig_wake_up;
+    sa.sa_flags   = 0;
+    sigemptyset(&sa.sa_mask);
+    if (-1 == sigaction(SIG_WAKE_UP, &sa, NULL)) {
+      return -1;
+    }
+
+    sigemptyset(&sigset);
+    sigaddset(&sigset, SIG_WAKE_UP);
+    sigprocmask(SIG_UNBLOCK, &sigset, NULL);
+
+    return 0;
+}
+
 static int SR_initialize() {
   struct sigaction act;
   char *s;
@@ -4491,6 +4515,12 @@ static int SR_initialize() {
 
   // Save signal flag
   os::Linux::set_our_sigflags(SR_signum, act.sa_flags);
+
+  if (MultiTenant
+      && -1 == sig_wake_up_init()) {
+    return -1;
+  }
+
   return 0;
 }
 
@@ -5140,6 +5170,12 @@ jint os::init_2(void) {
   if (SR_initialize() != 0) {
     perror("SR_initialize failed");
     return JNI_ERR;
+  }
+
+  if (MultiTenant && TenantThreadStop) {
+    address no_touch_page = (address)::mmap(NULL, Linux::page_size(), PROT_NONE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    guarantee(no_touch_page != MAP_FAILED, "os::init_2: failed to allocate TenantThreadStop ban page" );
+    TenantStopRecorder::set_no_touch_page(no_touch_page);
   }
 
   Linux::signal_sets_init();
@@ -6123,6 +6159,11 @@ int os::compare_file_modified_times(const char* file1, const char* file2) {
     return filetime1.tv_nsec - filetime2.tv_nsec;
   }
   return diff;
+}
+
+void os::wake_up(Thread *thread) {
+  pthread_t tid = thread->osthread()->pthread_id();
+  pthread_kill(tid, SIG_WAKE_UP);
 }
 
 /////////////// Unit tests ///////////////

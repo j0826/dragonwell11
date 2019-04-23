@@ -24,6 +24,8 @@
  */
 
 package java.lang;
+import com.alibaba.tenant.TenantContainer;
+
 import java.lang.ref.*;
 
 /**
@@ -73,7 +75,10 @@ public class InheritableThreadLocal<T> extends ThreadLocal<T> {
      * @param t the current thread
      */
     ThreadLocalMap getMap(Thread t) {
-       return t.inheritableThreadLocals;
+        if (Thread.isCallingFromRootTenantToNonRoot()) {
+            return TenantContainer.current().getFieldValue(t, "inheritableThreadLocals");
+        }
+        return t.inheritableThreadLocals;
     }
 
     /**
@@ -83,6 +88,11 @@ public class InheritableThreadLocal<T> extends ThreadLocal<T> {
      * @param firstValue value for the initial entry of the table.
      */
     void createMap(Thread t, T firstValue) {
-        t.inheritableThreadLocals = new ThreadLocalMap(this, firstValue);
+        if (Thread.isCallingFromRootTenantToNonRoot()) {
+            TenantContainer.current().getFieldValue(t, "inheritableThreadLocals",
+                    () -> new ThreadLocalMap(this, firstValue));
+        } else {
+            t.inheritableThreadLocals = new ThreadLocalMap(this, firstValue);
+        }
     }
 }

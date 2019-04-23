@@ -382,6 +382,18 @@ JVM_ENTRY(jobject, JVM_InitProperties(JNIEnv *env, jobject properties))
     }
   }
 
+  //Convert the -XX:+MultiTenant command line flag
+  //to the com.alibaba.tenant.enableMultiTenant property in case that
+  //the java code can determine if the tenant feature is enabled but
+  //without loading tenant-related classes.
+  {
+    if(MultiTenant) {
+      PUTPROP(props, "com.alibaba.tenant.enableMultiTenant", "true");
+    } else {
+      PUTPROP(props, "com.alibaba.tenant.enableMultiTenant", "false");
+    }
+  }
+
   // JVM monitoring and management support
   // Add the sun.management.compiler property for the compiler's name
   {
@@ -2836,12 +2848,37 @@ static void thread_entry(JavaThread* thread, TRAPS) {
   HandleMark hm(THREAD);
   Handle obj(THREAD, thread->threadObj());
   JavaValue result(T_VOID);
-  JavaCalls::call_virtual(&result,
-                          obj,
-                          SystemDictionary::Thread_klass(),
-                          vmSymbols::run_method_name(),
-                          vmSymbols::void_method_signature(),
-                          THREAD);
+
+  if(MultiTenant) {
+    oop tenantContainer =
+             java_lang_Thread::inherited_tenant_container(thread->threadObj());
+    if(tenantContainer == NULL) {
+      JavaCalls::call_virtual(&result,
+                              obj,
+                              SystemDictionary::Thread_klass(),
+                              vmSymbols::run_method_name(),
+                              vmSymbols::void_method_signature(),
+                              THREAD);
+    } else {
+      /*Call into TenantContainer.runThread instead  of Thread.run. */
+      Handle tenant_obj(THREAD, tenantContainer);
+      JavaCalls::call_virtual(&result,
+                              tenant_obj,
+                              SystemDictionary::com_alibaba_tenant_TenantContainer_klass(),
+                              vmSymbols::runThread_method_name(),
+                              vmSymbols::thread_void_signature(),
+                              obj,
+                              THREAD);
+
+    }
+  } else {
+    JavaCalls::call_virtual(&result,
+                            obj,
+                            SystemDictionary::Thread_klass(),
+                            vmSymbols::run_method_name(),
+                            vmSymbols::void_method_signature(),
+                            THREAD);
+  }
 }
 
 
@@ -3814,4 +3851,224 @@ JVM_ENTRY(jint, JVM_UnloadAOTLibrary(JNIEnv* env, jclass cls, jobject loader))
     return -1;
   }
   return 0;
+JVM_END
+
+/***************** Tenant support ************************************/
+
+JVM_ENTRY(jobject, JVM_CurrentTenant(JNIEnv *env, jclass tenantContainerClass))
+  JVMWrapper("JVM_CurrentTenant");
+  assert(MultiTenant, "pre-condition");
+  assert (NULL != thread, "no current thread!");
+  oop tenant = thread->tenantObj();
+  return JNIHandles::make_local(env, tenant);
+JVM_END
+
+JVM_ENTRY(void, JVM_AttachToTenant(JNIEnv *env, jobject tenant))
+  JVMWrapper("JVM_AttachToTenant");
+  assert(MultiTenant, "pre-condition");
+  assert (NULL != thread, "no current thread!");
+  thread->set_tenantObj(JNIHandles::resolve_non_null(tenant));
+JVM_END
+
+JVM_ENTRY(void, JVM_DetachFromTenant(JNIEnv *env, jobject tenant))
+  JVMWrapper("JVM_DetachFromTenant");
+  assert(MultiTenant, "pre-condition");
+  assert (NULL != thread, "no current thread!");
+  //switch thread to root tenant
+  thread->set_tenantObj(NULL);
+JVM_END
+
+JVM_ENTRY(void, JVM_TenantPrepareForDestroy(JNIEnv* env, jobject tenant, jboolean osWakeUp))
+  JVMWrapper("JVM_TenantPrepareForDestroy");
+  assert(MultiTenant, "pre-condition");
+  oop tenant_obj = JNIHandles::resolve_non_null(tenant);
+  assert(tenant_obj != NULL, "Cannot destroy a NULL tenant container");
+  Threads::kill_threads_of_tenant(tenant_obj, osWakeUp);
+JVM_END
+
+JVM_ENTRY_NO_ENV(jboolean, JVM_IsKilledByTenant(JNIEnv*env, jclass ignored, jobject jthread))
+  JVMWrapper("JVM_IsKilledByTenant");
+  if (MultiTenant && TenantThreadStop) {
+    JavaThread* java_thread = NULL;
+    if (NULL != jthread) {
+      oop thread_obj = JNIHandles::resolve_non_null(jthread);
+      java_thread = java_lang_Thread::thread(thread_obj);
+    }
+
+    Thread* cur_thread = Thread::current();
+    if (NULL == java_thread || cur_thread == java_thread) { // checking current thread
+      if (cur_thread->is_Java_thread()
+          && !cur_thread->is_Compiler_thread()) {
+        java_thread = (JavaThread*)cur_thread;
+      } else {
+        return JNI_FALSE;
+      }
+
+      // Now we are operating on ourselves.
+      // if TenantDeathException not found, just throw one proactively
+      if (java_thread->is_marked_for_tenant_shutdown()
+          && !java_thread->is_tenant_shutdown_masked()
+          && !java_thread->has_tenant_death_exception()) {
+        java_thread->set_pending_exception(Universe::tenant_death_exception(), __FILE__, __LINE__);
+      }
+
+      // for thread == self, return true as long as if  it is marked for tenant shutdown
+      // to break blocking I/O loop forcefully
+      return (java_thread->is_marked_for_tenant_shutdown() && !java_thread->is_tenant_shutdown_masked()) ? JNI_TRUE : JNI_FALSE;
+    } else {
+      // for thread != self, return true only when we TenantDeathException has been set successfully,
+      // to ensure TenantContainer.destroy() will try to set TenantDeathException if not found
+      return java_thread->has_tenant_death_exception() ? JNI_TRUE : JNI_FALSE;
+    }
+  }
+  return JNI_FALSE;
+JVM_END
+
+JVM_ENTRY(void, JVM_InterruptTenantThread(JNIEnv* env, jclass ignored, jobject jthread))
+  JVMWrapper("JVM_InterruptTenantThread");
+
+  assert(MultiTenant && TenantThreadStop, "pre-condition");
+  assert(THREAD->is_Java_thread(), "invariant");
+  // Ensure that the C++ Thread and OSThread structures aren't freed before we operate
+  Handle java_thread(THREAD, JNIHandles::resolve_non_null(jthread));
+  /*
+  if (UseWispMonitor) {
+    int task_id = Coroutine::WISP_ID_NOT_SET;
+    JavaThread* thr = NULL;
+    {
+      MutexLockerEx ml(((JavaThread *) THREAD)->threadObj() == java_thread() ? NULL : Threads_lock);
+      thr = java_lang_Thread::thread(java_thread());
+      if (thr != NULL) {
+        assert(thr->coroutine_list() != NULL, "coroutine list should have been initialized");
+        if (thr->coroutine_list()->wisp_thread() != NULL) {
+          task_id = thr->coroutine_list()->wisp_task_id();
+        }
+      }
+      if (task_id == Coroutine::WISP_ID_NOT_SET || !thr->try_start_tenant_shutdown()) {
+        // task_id == Coroutine::WISP_ID_NOT_SET means wisp is not fully initialized.
+        // !thr->try_start_tenant_shutdown() mean the thread mask the tentant shutdown,
+        // we should not interrupt it
+        return;
+      }
+      if (java_lang_Thread::thread(java_thread()) == NULL) {
+        guarantee(thr != NULL, "sanity check");
+        thr->end_tenant_shutdown();
+        return;
+      }
+    }
+    WispThread::interrupt(task_id, thread);
+    // the critical thread exit path is:
+    // 1. java_lang_Thread::set_thread(NULL)
+    // 2. TenantShutdownMask tsm;  // will spin wait for end_tenant_shutdown()
+    // 3. MutexLocker(Threads_lock)
+    // 4. delete thread
+    //
+    // the critical path reachs here is:
+    // 1. thr->try_start_tenant_shutdown() // will block TenantShutdownMask()
+    // 2. java_lang_Thread::thread() != null
+    //
+    // Reaching here indicates we're before thr exit path 1.
+    // deleting thr needs TenantShutdownMask(),
+    // but thr->try_start_tenant_shutdown() will prevent it.
+    // so thr is always a valid Thread pointer
+    guarantee(thr != NULL, "sanity check");
+    thr->end_tenant_shutdown();
+    return;
+  } */
+  JavaThread *thr = NULL;
+  ThreadsListHandle tlh;
+  jvmtiError err = JvmtiExport::cv_oop_to_JavaThread(tlh.list(), java_thread(), &thr);
+  if (thr != NULL
+      && err == JVMTI_ERROR_NONE
+      && thr->try_start_tenant_shutdown()) {
+    {
+      MutexLocker ml(Threads_lock);
+      Thread::interrupt(thr);
+    }
+    thr->end_tenant_shutdown();
+  }
+JVM_END
+
+JVM_ENTRY(void, JVM_WakeUpTenantThread(JNIEnv *env, jclass ignored, jobject jthread))
+  JVMWrapper("JVM_WakeUpTenantThread");
+  if (MultiTenant && TenantThreadStop && NULL != jthread) {
+    oop thread_obj = JNIHandles::resolve_non_null(jthread);
+    JavaThread* java_thread = java_lang_Thread::thread(thread_obj);
+    if (NULL != java_thread
+        && java_thread->thread_state() == _thread_in_native
+        && java_thread->try_start_tenant_shutdown()) {
+      os::wake_up(java_thread);
+      java_thread->end_tenant_shutdown();
+    }
+  }
+JVM_END
+
+JVM_ENTRY(void, JVM_MaskTenantShutdown(JNIEnv *env, jclass ignored))
+  JVMWrapper("JVM_MaskTenantShutdown");
+
+  assert(MultiTenant && TenantThreadStop, "pre-condition");
+  thread->mask_tenant_shutdown();
+JVM_END
+
+JVM_ENTRY(void, JVM_UnmaskTenantShutdown(JNIEnv *env, jclass ignored))
+  JVMWrapper("JVM_UnmaskTenantShutdown");
+
+  assert(MultiTenant && TenantThreadStop, "pre-condition");
+  thread->unmask_tenant_shutdown();
+JVM_END
+
+class DumpTenantThreadStacksOperation : public VM_Operation {
+private:
+  GrowableArray<JavaThread*>* _threads;
+
+public:
+  DumpTenantThreadStacksOperation(GrowableArray<JavaThread*>* threads)
+    : _threads(threads)
+  {
+    assert(MultiTenant, "sanity");
+  }
+
+  VMOp_Type type() const { return VMOp_ThreadDump; }
+
+  void doit() {
+    ResourceMark rm;
+    outputStream* st = tty;
+
+    for (GrowableArrayIterator<JavaThread*> itr = _threads->begin();
+         itr != _threads->end(); ++itr) {
+      JavaThread* thrd = *itr;
+      thrd->print_on(st);
+      thrd->print_stack_on(st);
+      /*
+      if (EnableCoroutine) {
+        assert(thrd->coroutine_list() != NULL, "coroutine list");
+        Coroutine* c = thrd->coroutine_list();
+        do {
+          c->print_stack_on(st);
+          c = c->next();
+        } while (c != thrd->coroutine_list());
+      }
+      */
+    }
+    st->cr();
+  }
+};
+
+JVM_ENTRY(void, JVM_DumpTenantThreadStacks(JNIEnv *env, jclass ignored, jobjectArray thread_array))
+  JVMWrapper("JVM_DumpTenantThreadStacks");
+  objArrayOop arr = (objArrayOop)JNIHandles::resolve_non_null(thread_array);
+  int arr_len = arr->length();
+  if (arr_len > 0) {
+    ResourceMark rm;
+    GrowableArray<JavaThread*> threads(arr_len);
+    for (int i = 0; i < arr_len; ++i) {
+      oop thread_obj = arr->obj_at(i);
+      if (thread_obj != NULL) {
+        threads.append(java_lang_Thread::thread(thread_obj));
+      }
+    }
+
+    DumpTenantThreadStacksOperation op(&threads);
+    VMThread::execute(&op);
+  }
 JVM_END

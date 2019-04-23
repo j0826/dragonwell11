@@ -193,6 +193,7 @@ void GenMarkSweep::mark_sweep_phase1(bool clear_all_softrefs) {
   ClassLoaderDataGraph::clear_claimed_marks();
 
   {
+    MarkingGCRoots mr;
     StrongRootsScope srs(1);
 
     gch->full_process_roots(&srs,

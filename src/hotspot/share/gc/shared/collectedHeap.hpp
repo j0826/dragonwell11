@@ -596,6 +596,13 @@ class CollectedHeap : public CHeapObj<mtInternal> {
     return (CIFireOOMAt > 1 && _fire_out_of_memory_count >= CIFireOOMAt);
   }
 #endif
+
+ private:
+  volatile jint _marking_gc_roots_level;
+ public:
+  void begin_marking_gc_roots_stw()   { Atomic::inc(&_marking_gc_roots_level);  }
+  void end_marking_gc_roots_stw()     { Atomic::dec(&_marking_gc_roots_level);  }
+  bool is_marking_gc_roots_stw()      { return _marking_gc_roots_level > 0;     }
 };
 
 // Class to set and reset the GC cause for a CollectedHeap.
@@ -612,6 +619,20 @@ class GCCauseSetter : StackObj {
 
   ~GCCauseSetter() {
     _heap->set_gc_cause(_previous_cause);
+  }
+};
+
+class MarkingGCRoots {
+public:
+  MarkingGCRoots() {
+    if (TenantThreadStop) {
+      Universe::heap()->begin_marking_gc_roots_stw();
+    }
+  }
+  ~MarkingGCRoots() {
+    if (TenantThreadStop) {
+      Universe::heap()->end_marking_gc_roots_stw();
+    }
   }
 };
 

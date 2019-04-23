@@ -349,7 +349,9 @@ static void check_class(Metadata* md) {
      md->print();
      ShouldNotReachHere();
    }
-   assert(klass->is_loader_alive(), "must be alive");
+   if (!TenantThreadStop) {
+     assert(klass->is_loader_alive(), "must be alive");
+   }
 }
 #endif // ASSERT
 

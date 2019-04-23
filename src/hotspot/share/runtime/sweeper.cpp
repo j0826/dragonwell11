@@ -170,6 +170,9 @@ public:
     assert(cb->is_nmethod() || cb->is_aot(), "CodeBlob should be nmethod or aot method");
     if (cb->is_nmethod()) {
       nmethod* nm = (nmethod*)cb;
+      if (TenantThreadStop) {
+        nm->set_seen_on_stack(true);
+      }
       nm->set_hotness_counter(NMethodSweeper::hotness_counter_reset_val());
       // If we see an activation belonging to a non_entrant nmethod, we mark it.
       if (nm->is_not_entrant()) {

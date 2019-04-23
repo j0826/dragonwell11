@@ -120,6 +120,8 @@ class nmethod : public CompiledMethod {
   // protected by CodeCache_lock
   bool _has_flushed_dependencies;            // Used for maintenance of dependencies (CodeCache_lock)
 
+  volatile bool _seen_on_stack;              // If the nmethod is seen on stack during safepoint
+
   // used by jvmti to track if an unload event has been posted for this nmethod.
   bool _unload_reported;
 
@@ -444,6 +446,9 @@ public:
   void mark_as_seen_on_stack();
   bool can_convert_to_zombie();
 
+  void set_seen_on_stack(bool v) { _seen_on_stack = v; }
+  bool is_seen_on_stack();
+
   // Evolution support. We make old (discarded) compiled methods point to new Method*s.
   void set_method(Method* method) { _method = method; }
 
@@ -618,6 +623,14 @@ public:
   virtual CompiledStaticCall* compiledStaticCall_at(Relocation* call_site) const;
   virtual CompiledStaticCall* compiledStaticCall_at(address addr) const;
   virtual CompiledStaticCall* compiledStaticCall_before(address addr) const;
+
+private:
+  // If this nmethod is eagerly retired by dead classes
+  volatile bool _eagerly_retired_by_dead_classes;
+  void purge_dead_oops(BoolObjectClosure* is_alive);
+public:
+  void set_eagerly_retired_by_dead_classes();
+  bool is_eagerly_retired_by_dead_classes() { return _eagerly_retired_by_dead_classes; }
 };
 
 // Locks an nmethod so its code will not get removed and it will not

@@ -208,6 +208,18 @@ public:
   static void set_defer_thr_suspend_loop_count() {
     _defer_thr_suspend_loop_count = 1;
   }
+
+ private:
+  // will be reset to 'false' at every SafepointSynchronize::begin(), to indicate
+  // if should make on-stack nmethod with dead oops not_entrant at SafepointSynchronize::end();
+  static volatile bool _should_clear_nmethods;
+  // if currently at a safepoint of full gc pause
+  static volatile bool _is_at_full_gc_pause;
+ public:
+  static bool should_clear_nmethods()                      { return _should_clear_nmethods;  }
+  static void set_should_clear_nmethods(bool v)            { _should_clear_nmethods = v;     }
+  static bool is_at_full_gc_pause()                        { return _is_at_full_gc_pause;    }
+  static void set_at_full_gc_pause(bool v)                 { _is_at_full_gc_pause = v;       }
 };
 
 // Some helper assert macros for safepoint checks.

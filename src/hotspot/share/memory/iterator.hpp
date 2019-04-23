@@ -361,4 +361,19 @@ class OopIteratorClosureDispatch {
   template <typename OopClosureType> static void oop_oop_iterate_backwards(OopClosureType* cl, oop obj, Klass* klass);
 };
 
+// Determine if an object's associated ClassLoader object is alive.
+// associated ClassLoader means:
+// - if class of the object is java.lang.ClassLoader, accosiated classloader is itself
+// - if class of the object is java.lang.ProtectionDomain, accosiated classloader is 'ProtectionDomain.classLoader'
+// - if class of the object is java.lang.Class, associated classloader is 'Class.classLoader'
+// - for all other classes, will just return true and leave it as is
+class IsTenantClassLoaderAlive : public BoolObjectClosure {
+ private:
+  bool _found_any;
+ public:
+  IsTenantClassLoaderAlive() : _found_any(false) { }
+  bool found_any() { return _found_any; }
+  virtual bool do_object_b(oop obj);
+};
+
 #endif // SHARE_VM_MEMORY_ITERATOR_HPP

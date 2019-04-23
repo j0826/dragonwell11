@@ -100,6 +100,8 @@ class StubRoutines: AllStatic {
   static address _throw_StackOverflowError_entry;
   static address _throw_delayed_StackOverflowError_entry;
 
+  static address _handler_for_tenant_stop_exception_entry;
+
   static address _atomic_xchg_entry;
   static address _atomic_xchg_long_entry;
   static address _atomic_store_entry;
@@ -273,6 +275,8 @@ class StubRoutines: AllStatic {
   static address throw_NullPointerException_at_call_entry(){ return _throw_NullPointerException_at_call_entry; }
   static address throw_StackOverflowError_entry()          { return _throw_StackOverflowError_entry; }
   static address throw_delayed_StackOverflowError_entry()  { return _throw_delayed_StackOverflowError_entry; }
+
+  static address handler_for_tenant_stop_exception()       { return _handler_for_tenant_stop_exception_entry; }
 
   static address atomic_xchg_entry()                       { return _atomic_xchg_entry; }
   static address atomic_xchg_long_entry()                  { return _atomic_xchg_long_entry; }

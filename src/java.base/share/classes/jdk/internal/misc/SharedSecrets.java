@@ -75,6 +75,7 @@ public class SharedSecrets {
     private static JavaIORandomAccessFileAccess javaIORandomAccessFileAccess;
     private static JavaSecuritySignatureAccess javaSecuritySignatureAccess;
     private static JavaxCryptoSealedObjectAccess javaxCryptoSealedObjectAccess;
+    private static TenantAccess tenantAccess;
 
     public static JavaUtilJarAccess javaUtilJarAccess() {
         if (javaUtilJarAccess == null) {
@@ -348,5 +349,13 @@ public class SharedSecrets {
             unsafe.ensureClassInitialized(SealedObject.class);
         }
         return javaxCryptoSealedObjectAccess;
+    }
+
+    public static void setTenantAccess(TenantAccess access) {
+        tenantAccess = access;
+    }
+
+    public static TenantAccess getTenantAccess() {
+        return tenantAccess;
     }
 }

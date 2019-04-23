@@ -60,6 +60,8 @@ import java.util.function.Supplier;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 
+import com.alibaba.tenant.TenantContainer;
+import com.alibaba.tenant.TenantGlobals;
 import jdk.internal.util.StaticProperty;
 import jdk.internal.module.ModuleBootstrap;
 import jdk.internal.module.ServicesCatalog;
@@ -717,8 +719,11 @@ public final class System {
         if (sm != null) {
             sm.checkPropertiesAccess();
         }
-
-        return props;
+        if(TenantGlobals.isDataIsolationEnabled() && null != TenantContainer.current()) {
+            return TenantContainer.current().getProperties();
+        } else {
+            return props;
+        }
     }
 
     /**
@@ -769,11 +774,15 @@ public final class System {
         if (sm != null) {
             sm.checkPropertiesAccess();
         }
-        if (props == null) {
-            props = new Properties();
-            initProperties(props);
+        if(TenantGlobals.isDataIsolationEnabled() && null != TenantContainer.current()) {
+            TenantContainer.current().setProperties(props);
+        } else {
+            if (props == null) {
+                props = new Properties();
+                initProperties(props);
+            }
+            System.props = props;
         }
-        System.props = props;
     }
 
     /**
@@ -813,7 +822,11 @@ public final class System {
             sm.checkPropertyAccess(key);
         }
 
-        return props.getProperty(key);
+        if(VM.isBooted() && TenantGlobals.isDataIsolationEnabled() && null != TenantContainer.current()) {
+            return TenantContainer.current().getProperty(key);
+        } else {
+            return props.getProperty(key);
+        }
     }
 
     /**
@@ -848,7 +861,11 @@ public final class System {
             sm.checkPropertyAccess(key);
         }
 
-        return props.getProperty(key, def);
+        if(TenantGlobals.isDataIsolationEnabled() && null != TenantContainer.current()) {
+            return TenantContainer.current().getProperties().getProperty(key, def);
+        } else {
+            return props.getProperty(key, def);
+        }
     }
 
     /**
@@ -892,7 +909,11 @@ public final class System {
                 SecurityConstants.PROPERTY_WRITE_ACTION));
         }
 
-        return (String) props.setProperty(key, value);
+        if(TenantGlobals.isDataIsolationEnabled() && null != TenantContainer.current()) {
+            return TenantContainer.current().setProperty(key, value);
+        } else {
+            return (String) props.setProperty(key, value);
+        }
     }
 
     /**
@@ -932,7 +953,11 @@ public final class System {
             sm.checkPermission(new PropertyPermission(key, "write"));
         }
 
-        return (String) props.remove(key);
+        if(TenantGlobals.isDataIsolationEnabled() && null != TenantContainer.current()) {
+            return TenantContainer.current().clearProperty(key);
+        } else {
+            return (String) props.remove(key);
+        }
     }
 
     private static void checkKey(String key) {
@@ -2204,6 +2229,12 @@ public final class System {
                 return StringCoding.getBytesUTF8NoRepl(s);
             }
 
+            public void disposeTenantClassLoader(ClassLoader cl) {
+                cl.dispose();
+            }
+            public void setChildShouldInheritTenant(Thread thread, boolean shouldInherit) {
+                thread.tenantInheritance = shouldInherit;
+            }
         });
     }
 }

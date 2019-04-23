@@ -198,7 +198,8 @@ CollectedHeap::CollectedHeap() :
   _total_collections(0),
   _total_full_collections(0),
   _gc_cause(GCCause::_no_gc),
-  _gc_lastcause(GCCause::_no_gc)
+  _gc_lastcause(GCCause::_no_gc),
+  _marking_gc_roots_level(0)
 {
   const size_t max_len = size_t(arrayOopDesc::max_array_length(T_INT));
   const size_t elements_per_word = HeapWordSize / sizeof(jint);

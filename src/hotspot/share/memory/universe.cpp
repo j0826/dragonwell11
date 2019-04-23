@@ -122,6 +122,7 @@ oop Universe::_out_of_memory_error_class_metaspace    = NULL;
 oop Universe::_out_of_memory_error_array_size         = NULL;
 oop Universe::_out_of_memory_error_gc_overhead_limit  = NULL;
 oop Universe::_out_of_memory_error_realloc_objects    = NULL;
+oop Universe::_tenant_death_exception                 = NULL;
 oop Universe::_delayed_stack_overflow_error_message   = NULL;
 objArrayOop Universe::_preallocated_out_of_memory_error_array = NULL;
 volatile jint Universe::_preallocated_out_of_memory_error_avail_count = 0;
@@ -202,6 +203,9 @@ void Universe::oops_do(OopClosure* f, bool do_all) {
   f->do_oop((oop*)&_out_of_memory_error_array_size);
   f->do_oop((oop*)&_out_of_memory_error_gc_overhead_limit);
   f->do_oop((oop*)&_out_of_memory_error_realloc_objects);
+  if (MultiTenant && TenantThreadStop) {
+    f->do_oop((oop*)&_tenant_death_exception);
+  }
   f->do_oop((oop*)&_delayed_stack_overflow_error_message);
   f->do_oop((oop*)&_preallocated_out_of_memory_error_array);
   f->do_oop((oop*)&_null_ptr_exception_instance);
@@ -1021,6 +1025,12 @@ bool universe_post_init() {
   Universe::_out_of_memory_error_gc_overhead_limit =
     ik->allocate_instance(CHECK_false);
   Universe::_out_of_memory_error_realloc_objects = ik->allocate_instance(CHECK_false);
+
+  if (MultiTenant && TenantThreadStop) {
+    // Create the special exception used to kill thread
+    k = SystemDictionary::resolve_or_fail(vmSymbols::com_alibaba_tenant_TenantDeathException(), true, CHECK_false);
+    Universe::_tenant_death_exception = InstanceKlass::cast(k)->allocate_instance(CHECK_false);
+  }
 
   // Setup preallocated cause message for delayed StackOverflowError
   if (StackReservedPages > 0) {

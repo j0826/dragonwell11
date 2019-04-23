@@ -538,4 +538,19 @@ public class WhiteBox {
 
   // Decoder
   public native void disableElfSectionCache();
+
+  /**
+   * Invoke predefined caller code of static methods from InterpreterRuntime.
+   * Implemented tester methods:
+   *   InterpreterRuntime::new_illegal_monitor_state_exception     args[0] will be set as vm_result before calling
+   *
+   * @param name  Name of method from C++ class InterpreterRuntime
+   * @param args  Arguments to be passed to the method
+   *
+   * TODO: this can be a generic testing framework for any C++ methods from HotSpot JVM.
+   */
+  public native void callInterpreterRuntimeEntry(String name, Object[] args);
+  // pre-defined method names from C++ class InterpreterRuntime,
+  // will be used as argument to `callInterpreterRuntimeEntry(String name)`
+  public static final String IRT_ENTRY_NEW_ILLEGAL_MONITOR_STATE_EXCEPTION = "new_illegal_monitor_state_exception";
 }

@@ -89,6 +89,8 @@
 #include "utilities/nativeCallStack.hpp"
 #endif // INCLUDE_NMT
 
+#include "interpreter/interpreterRuntime.hpp"
+
 #ifdef LINUX
 #include "osContainer_linux.hpp"
 #endif
@@ -1994,6 +1996,37 @@ WB_ENTRY(void, WB_DisableElfSectionCache(JNIEnv* env))
 #endif
 WB_END
 
+WB_ENTRY(void, WB_CallInterpreterRuntimeEntry(JNIEnv* env, jobject wb, jstring name, jobjectArray args))
+  ResourceMark rm;
+  char* c_name = java_lang_String::as_utf8_string(JNIHandles::resolve_non_null(name));
+  // args can be NULL, its usage differs based on corresponding IRT entry
+  objArrayOop argArr = NULL;
+  if (args != NULL) {
+    argArr = (objArrayOop)JNIHandles::resolve_non_null(args);
+  }
+  if (strncmp("new_illegal_monitor_state_exception", c_name, 35) == 0) {
+    guarantee(argArr != NULL, "must be!");
+    guarantee(argArr->length() == 1, "must be!");
+    // first argument is the target VM result object
+    oop vm_res_obj = argArr->obj_at(0);
+    // simulate the behavior of a Java caller
+    ThreadStateTransition::transition_and_fence(thread, _thread_in_vm, _thread_in_Java);
+    // vm_results `will be cleared by new_illegal_monitor_state_exception
+    /*
+    if (EnableCoroutine && UseWispMonitor) {
+      thread->set_vm_result_for_wisp(vm_res_obj);
+    } else {
+    */
+      thread->set_vm_result(vm_res_obj);
+    // }
+    InterpreterRuntime::new_illegal_monitor_state_exception(thread);
+    ThreadStateTransition::transition_and_fence(thread, _thread_in_Java, _thread_in_vm);
+  } else {
+    tty->print_cr("Unkown InterpreterRuntime entry: %s", c_name);
+    ShouldNotReachHere();
+  }
+WB_END
+
 
 #define CC (char*)
 
@@ -2218,6 +2251,8 @@ static JNINativeMethod methods[] = {
   {CC"isContainerized",           CC"()Z",            (void*)&WB_IsContainerized },
   {CC"printOsInfo",               CC"()V",            (void*)&WB_PrintOsInfo },
   {CC"disableElfSectionCache",    CC"()V",            (void*)&WB_DisableElfSectionCache },
+  {CC"callInterpreterRuntimeEntry", CC"(Ljava/lang/String;[Ljava/lang/Object;)V",
+                                                      (void*)&WB_CallInterpreterRuntimeEntry },
 };
 
 

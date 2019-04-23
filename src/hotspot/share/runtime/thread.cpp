@@ -1501,6 +1501,7 @@ void JavaThread::initialize() {
   _anchor.clear();
   set_entry_point(NULL);
   set_jni_functions(jni_functions());
+  set_tenant_functions(tenant_functions());
   set_callee_target(NULL);
   set_vm_result(NULL);
   set_vm_result_2(NULL);
@@ -1555,6 +1556,10 @@ void JavaThread::initialize() {
   _do_not_unlock_if_synchronized = false;
   _cached_monitor_info = NULL;
   _parker = Parker::Allocate(this);
+  _tenantObj = NULL;
+
+  _tenant_shutdown_mark_level = TSM_idle;
+  _marked_for_tenant_shutdown = false;
 
 #ifndef PRODUCT
   _jmp_ring_index = 0;
@@ -1828,6 +1833,7 @@ void JavaThread::exit(bool destroy_vm, ExitType exit_type) {
   }
   if (!destroy_vm) {
     if (uncaught_exception.not_null()) {
+      TenantShutdownMark tsm(this); // ensure not interrupted by tenant death
       EXCEPTION_MARK;
       // Call method Thread.dispatchUncaughtException().
       Klass* thread_klass = SystemDictionary::Thread_klass();
@@ -1866,6 +1872,7 @@ void JavaThread::exit(bool destroy_vm, ExitType exit_type) {
     if (!is_Compiler_thread()) {
       int count = 3;
       while (java_lang_Thread::threadGroup(threadObj()) != NULL && (count-- > 0)) {
+        TenantShutdownMark tsm(this); // ensure clean up not interrupted by tenant death
         EXCEPTION_MARK;
         JavaValue result(T_VOID);
         Klass* thread_klass = SystemDictionary::Thread_klass();
@@ -2008,6 +2015,23 @@ void JavaThread::exit(bool destroy_vm, ExitType exit_type) {
   }
 }
 
+void JavaThread::set_tenantObj(oop tenantObj) {
+  assert(this == JavaThread::current(), "sanity-check");
+  assert(MultiTenant
+         // prevent duplicate assigning values of non-ROOT tenant;
+         // but allow duplicated values of ROOT tenant, to support
+         // TenantContainer.destroy() while alive threads attached
+         && (_tenantObj != tenantObj || tenantObj == NULL),
+         "pre-condition");
+
+  if (_tenantObj == tenantObj) {
+    return;
+  }
+
+  oop prev_tenant = _tenantObj;
+  _tenantObj = tenantObj;
+}
+
 void JavaThread::cleanup_failed_attach_current_thread() {
   if (active_handles() != NULL) {
     JNIHandleBlock* block = active_handles();
@@ -2047,6 +2071,194 @@ JavaThread* JavaThread::active() {
   }
 }
 
+// Tenant shutdown related operations
+
+void JavaThread::clear_tenant_death_exception() {
+  assert(MultiTenant && TenantThreadStop, "pre-condition");
+  if (NULL != _pending_async_exception
+      && _pending_async_exception == Universe::tenant_death_exception()) {
+    _pending_async_exception = NULL;
+    _special_runtime_exit_condition = _no_async_condition;
+    clear_has_async_exception();
+  }
+  if (has_pending_exception()
+      && pending_exception() == Universe::tenant_death_exception()) {
+    clear_pending_exception();
+  }
+}
+
+bool JavaThread::has_tenant_death_exception() {
+  assert(MultiTenant && TenantThreadStop, "pre-condition");
+  return (_pending_async_exception == Universe::tenant_death_exception()
+          || pending_exception() == Universe::tenant_death_exception());
+}
+
+void JavaThread::set_tenant_death_exception() {
+  assert(MultiTenant && TenantThreadStop
+         && _tenant_shutdown_mark_level <= TSM_idle, "pre-condition");
+
+  set_pending_async_exception(Universe::tenant_death_exception());
+#ifndef PRODUCT
+  if (MultiTenant && TenantThreadStop && TraceTenantThreadStop) {
+    tty->print_cr("Special async exception set for thread" PTR_FORMAT "!", p2i(this));
+  }
+#endif
+}
+
+bool JavaThread::is_marked_for_tenant_shutdown() {
+  assert(MultiTenant && TenantThreadStop, "pre-condition");
+  return _marked_for_tenant_shutdown;
+}
+
+void JavaThread::mark_for_tenant_shutdown() {
+  assert(MultiTenant && TenantThreadStop, "pre-condition");
+  _marked_for_tenant_shutdown = true;
+}
+
+// will block infinitely to wait for killer thread to
+// finish shutdown operations on current thread
+void JavaThread::disable_tenant_shutdown() {
+  assert(MultiTenant && TenantThreadStop
+         && _tenant_shutdown_mark_level > TSM_uninitialized, "pre-condition");
+  assert(this == Thread::current(), "Only allow to be called by current thread");
+
+  /*
+  if (EnableCoroutine && !current_coroutine()->is_thread_coroutine()) {
+    return;
+  }
+  */
+
+  int old_level, new_level, level;
+  old_level = new_level = level = TSM_uninitialized;
+  do {
+    level = TSM_uninitialized;
+    old_level = _tenant_shutdown_mark_level;
+    if (old_level == TSM_being_killed) {
+      // spinning if TenantContainer.destroy() is ongoing
+      continue;
+    } else {
+      new_level = old_level + 1;
+      level = Atomic::cmpxchg(new_level, &_tenant_shutdown_mark_level, old_level);
+    }
+  } while (level != old_level);
+
+#ifndef PRODUCT
+  if (TraceTenantThreadStop) {
+    tty->print_cr("Disabled tenant shutdown on thread " PTR_FORMAT ", to_level = %d", p2i(this), new_level);
+  }
+#endif
+
+  assert(_tenant_shutdown_mark_level > TSM_idle, "post-condition");
+}
+
+void JavaThread::enable_tenant_shutdown() {
+  assert(MultiTenant && TenantThreadStop
+         && _tenant_shutdown_mark_level > TSM_idle, "pre-condition");
+  assert(this == Thread::current(), "Only allow to be called by current thread");
+
+  /*
+  if (EnableCoroutine && !current_coroutine()->is_thread_coroutine()) {
+    return;
+  }
+  */
+
+  if (_tenant_shutdown_mark_level > TSM_idle) {
+    Atomic::dec(&_tenant_shutdown_mark_level);
+  } else {
+    ShouldNotReachHere();
+  }
+
+#ifndef PRODUCT
+  if (TraceTenantThreadStop) {
+    tty->print_cr("Enabled tenant shutdown on thread " PTR_FORMAT ", to_level = %d", p2i(this), _tenant_shutdown_mark_level);
+  }
+#endif
+  assert(_tenant_shutdown_mark_level >= TSM_idle, "post-condition");
+}
+
+bool JavaThread::try_start_tenant_shutdown() {
+  assert(MultiTenant && TenantThreadStop
+         && _tenant_shutdown_mark_level >= TSM_idle, "pre-condition");
+
+  int level = TSM_uninitialized;
+  int spins = 64;
+  do {
+    level = Atomic::cmpxchg((int)TSM_being_killed, &_tenant_shutdown_mark_level, (int)TSM_idle);
+    assert(level != TSM_uninitialized, "post-condition");
+    if (level == TSM_idle) {
+      assert(_tenant_shutdown_mark_level == TSM_being_killed, "post-condition");
+#ifndef PRODUCT
+      if (TraceTenantThreadStop) {
+        tty->print_cr("Begin tenant shutdown on thread " PTR_FORMAT, p2i(this));
+      }
+#endif
+      return true;
+    }
+    --spins;
+  } while (level > TSM_idle && spins >= 0);
+
+#ifndef PRODUCT
+  if (TraceTenantThreadStop) {
+    tty->print_cr("Skip tenant shutdown on thread " PTR_FORMAT, p2i(this));
+  }
+#endif
+
+  assert(_tenant_shutdown_mark_level > TSM_being_killed, "post-condition");
+  return false;
+}
+
+void JavaThread::end_tenant_shutdown() {
+  assert(MultiTenant && TenantThreadStop
+         && _tenant_shutdown_mark_level == TSM_being_killed, "pre-condition");
+
+  if (_tenant_shutdown_mark_level == TSM_being_killed) {
+    Atomic::store((int)TSM_idle, &_tenant_shutdown_mark_level);
+  } else {
+    ShouldNotReachHere();
+  }
+
+#ifndef PRODUCT
+  if (TraceTenantThreadStop) {
+    tty->print_cr("End tenant shutdown on thread " PTR_FORMAT, p2i(this));
+  }
+#endif
+
+  assert(_tenant_shutdown_mark_level > TSM_being_killed, "pre-condition");
+}
+
+void JavaThread::mask_tenant_shutdown() {
+  assert(MultiTenant && TenantThreadStop && is_Java_thread(), "pre-condition");
+  assert(this == Thread::current(), "Only allow to mask self");
+
+  disable_tenant_shutdown();
+
+  // clear TenantDeathException if already set
+  if (has_tenant_death_exception()) {
+    assert(is_marked_for_tenant_shutdown(), "pre-condition");
+    clear_tenant_death_exception();
+  }
+}
+
+void JavaThread::unmask_tenant_shutdown() {
+  assert(MultiTenant && TenantThreadStop && is_Java_thread(), "pre-condition");
+  assert(this == Thread::current(), "Only allow to unmask self");
+
+  // restore TenantDeathException if already set
+  if (is_marked_for_tenant_shutdown()
+      && _tenant_shutdown_mark_level == TSM_marked_begin) { // if marked but not masked
+    assert(!has_tenant_death_exception(), "pre-condition");
+    Exceptions::_throw_oop(this, __FILE__, __LINE__, Universe::tenant_death_exception());
+  }
+
+  enable_tenant_shutdown();
+}
+
+bool JavaThread::is_tenant_shutdown_masked() {
+  assert(MultiTenant && TenantThreadStop, "pre-condition");
+  return _tenant_shutdown_mark_level > TSM_idle;
+}
+
+// End of tenant shutdown related operations
 bool JavaThread::is_lock_owned(address adr) const {
   if (Thread::is_lock_owned(adr)) return true;
 
@@ -2120,7 +2332,8 @@ void JavaThread::check_and_handle_async_exceptions(bool check_unsafe_error) {
   // Check for pending async. exception
   if (_pending_async_exception != NULL) {
     // Only overwrite an already pending exception, if it is not a threadDeath.
-    if (!has_pending_exception() || !pending_exception()->is_a(SystemDictionary::ThreadDeath_klass())) {
+    if (!has_pending_exception() || !pending_exception()->is_a(SystemDictionary::ThreadDeath_klass())
+        || !pending_exception()->is_a(SystemDictionary::com_alibaba_tenant_TenantDeathException_klass())) {
 
       // We cannot call Exceptions::_throw(...) here because we cannot block
       set_pending_exception(_pending_async_exception, __FILE__, __LINE__);
@@ -2844,6 +3057,10 @@ void JavaThread::oops_do(OopClosure* f, CodeBlobClosure* cf) {
   f->do_oop((oop*) &_exception_oop);
   f->do_oop((oop*) &_pending_async_exception);
 
+  if (MultiTenant) {
+    f->do_oop((oop*) &_tenantObj);
+  }
+
   if (jvmti_thread_state() != NULL) {
     jvmti_thread_state()->oops_do(f);
   }
@@ -3537,6 +3754,13 @@ static void call_initPhase3(TRAPS) {
   JavaValue result(T_VOID);
   JavaCalls::call_static(&result, klass, vmSymbols::initPhase3_name(),
                                          vmSymbols::void_method_signature(), CHECK);
+
+  // VM.isBooted() is set in System.initPhase3(), and TenantContainer depends on that state
+  if (MultiTenant) {
+    klass =  SystemDictionary::resolve_or_fail(vmSymbols::com_alibaba_tenant_TenantContainer(), true, CHECK);
+    JavaCalls::call_static(&result, klass, vmSymbols::initializeTenantContainerClass_name(),
+                                           vmSymbols::void_method_signature(), CHECK);
+  }
 }
 
 void Threads::initialize_java_lang_classes(JavaThread* main_thread, TRAPS) {
@@ -5004,3 +5228,100 @@ void Threads::verify() {
   VMThread* thread = VMThread::vm_thread();
   if (thread != NULL) thread->verify();
 }
+
+void Threads::kill_threads_of_tenant(oop tenant_obj, jboolean os_wake_up) {
+  assert(MultiTenant && TenantThreadStop && NULL != tenant_obj, "pre-condition");
+
+  VM_StopTenantThreads* vm_op = new VM_StopTenantThreads(tenant_obj, JNI_TRUE == os_wake_up);
+  VMThread::execute(vm_op);
+}
+
+void Threads::mark_threads_for_tenant_shutdown(oop tenant_obj, bool os_wake_up) {
+  assert(MultiTenant && TenantThreadStop, "pre-condition");
+  assert(tenant_obj != NULL, "Cannot kill threads of ROOT tenant");
+
+  assert(Thread::current()->is_VM_thread(), "should be in the vm thread");
+  assert(Threads_lock->is_locked(), "Threads_lock should be locked by safepoint code");
+  assert(SafepointSynchronize::is_at_safepoint(), "must be!");
+
+  // for all threads attached to target tenant container object
+  ALL_JAVA_THREADS(thread) {
+
+    assert(thread->is_Java_thread(), "Just checking");
+
+    if (java_lang_Thread::inherited_tenant_container(thread->threadObj()) == tenant_obj
+          && !thread->is_Compiler_thread()  /* CompilerThread is subclass of JavaThread, skip it */
+          && !thread->is_terminated() /* skip dying thread */ ) {
+
+      thread->mark_for_tenant_shutdown();
+
+      if (!thread->has_tenant_death_exception() // skip those already marked
+          && !thread->is_tenant_shutdown_masked()
+          && thread->try_start_tenant_shutdown()) {
+
+        assert(NULL != thread->threadObj(), "Just checking");
+
+#ifndef PRODUCT
+        if (MultiTenant && TenantThreadStop && TraceTenantThreadStop) {
+          ResourceMark rm;
+          tty->print_cr("Marking thread " PTR_FORMAT "(%s) for tenant destroying" PTR_FORMAT,
+                        p2i(thread),
+                        thread->get_thread_name(),
+                        p2i(tenant_obj));
+        }
+#endif
+
+        // deoptimize the last java frame, see Thread::send_thread_stop()
+        if (thread->has_last_Java_frame()) {
+          frame f = thread->last_frame();
+          if (f.is_runtime_frame() || f.is_safepoint_blob_frame()) {
+            // BiasedLocking needs an updated RegisterMap for the revoke monitors pass
+            RegisterMap reg_map(thread, UseBiasedLocking);
+            frame compiled_frame = f.sender(&reg_map);
+            if (!StressCompiledExceptionHandlers && compiled_frame.can_be_deoptimized()) {
+              Deoptimization::deoptimize(thread, compiled_frame, &reg_map);
+            }
+          }
+        }
+
+        // Set the special exception
+        thread->set_tenant_death_exception();
+
+        thread->end_tenant_shutdown();
+      }
+
+      // Try to wake up thread
+      if (thread->has_tenant_death_exception()
+          && !thread->is_tenant_shutdown_masked()
+          && thread->try_start_tenant_shutdown()) {
+        Thread::interrupt(thread);
+        // Use os::wake_up those blocked in native code
+        if (os_wake_up && thread->thread_state() == _thread_in_native) {
+          os::wake_up(thread);
+        }
+        thread->end_tenant_shutdown();
+      }
+    }
+  }
+}
+
+TenantShutdownMark::TenantShutdownMark(Thread* thrd)
+  : _thread(NULL) {
+  assert(NULL != thrd, "pre-condition");
+  if (MultiTenant && TenantThreadStop
+      && thrd->is_Java_thread()
+      && !thrd->is_Compiler_thread()) {
+    _thread = (JavaThread*)thrd;
+    _thread->mask_tenant_shutdown();
+  }
+}
+
+TenantShutdownMark::~TenantShutdownMark() {
+  if (MultiTenant && TenantThreadStop
+      && is_init_completed()
+      && NULL != _thread) {
+    _thread->unmask_tenant_shutdown();
+  }
+}
+
+address TenantStopRecorder::_no_touch_page = 0;

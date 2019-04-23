@@ -321,6 +321,7 @@ class java_lang_Thread : AllStatic {
   static int _thread_status_offset;
   static int _park_blocker_offset;
   static int _park_event_offset ;
+  static int _inheritedTenantContainer_offset;
 
   static void compute_offsets();
 
@@ -354,6 +355,8 @@ class java_lang_Thread : AllStatic {
   static oop context_class_loader(oop java_thread);
   // Control context
   static oop inherited_access_control_context(oop java_thread);
+  // Tenant container
+  static oop inherited_tenant_container(oop java_thread);
   // Stack size hint
   static jlong stackSize(oop java_thread);
   // Thread ID
@@ -1267,6 +1270,18 @@ class java_security_AccessControlContext: AllStatic {
   friend class JavaClasses;
 };
 
+// Interface to java.security.ProtectionDomain objects
+
+class java_security_ProtectionDomain : AllStatic {
+private:
+  static int class_loader_offset;
+
+  static void compute_offsets();
+public:
+  static oop class_loader(Handle pd);
+
+  friend class JavaClasses;
+};
 
 // Interface to java.lang.ClassLoader objects
 
@@ -1276,6 +1291,7 @@ class java_security_AccessControlContext: AllStatic {
 class java_lang_ClassLoader : AllStatic {
  private:
   static int _loader_data_offset;
+  static int is_dead_offset;
   static bool offsets_computed;
   static int parent_offset;
   static int parallelCapable_offset;
@@ -1312,6 +1328,8 @@ class java_lang_ClassLoader : AllStatic {
     return klass->is_subclass_of(SystemDictionary::ClassLoader_klass());
   }
   static bool is_instance(oop obj);
+
+  static bool is_dead(oop loader);
 
   static oop unnamedModule(oop loader);
 

@@ -117,6 +117,7 @@
   template(ScavengeMonitors)                      \
   template(PrintMetadata)                         \
   template(GTestExecuteAtSafepoint)               \
+  template(StopTenantThreads)                     \
 
 class VM_Operation: public CHeapObj<mtInternal> {
  public:
@@ -517,5 +518,27 @@ class VM_PrintClassHierarchy: public VM_Operation {
   void doit();
 };
 #endif // INCLUDE_SERVICES
+
+/*
+ * Used to issue a thread killing operation for particular tenant
+ *
+ */
+class VM_StopTenantThreads :public VM_Operation {
+ private:
+  oop _tenant_obj;
+  bool _os_wake_up;
+
+ public:
+  VM_StopTenantThreads(oop obj, bool wake_up)
+    : _tenant_obj(obj), _os_wake_up(wake_up) {
+    assert(MultiTenant && TenantThreadStop, "pre-condition");
+  }
+  VMOp_Type type() const                  { return VMOp_StopTenantThreads; }
+  bool is_cheap_allocated() const         { return true; }
+  bool allow_nested_vm_operations() const { return true; }
+  virtual Mode evaluation_mode() const    { return _safepoint; }
+  void doit();
+  void oops_do(OopClosure* f); // GC support
+};
 
 #endif // SHARE_VM_RUNTIME_VM_OPERATIONS_HPP

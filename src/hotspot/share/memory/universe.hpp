@@ -162,6 +162,9 @@ class Universe: AllStatic {
   // preallocated cause message for delayed StackOverflowError
   static oop          _delayed_stack_overflow_error_message;
 
+  // A special object used to kill threads for MultiTenant mode
+  static oop          _tenant_death_exception;
+
   static Array<int>*       _the_empty_int_array;    // Canonicalized int array
   static Array<u2>*        _the_empty_short_array;  // Canonicalized short array
   static Array<Klass*>*  _the_empty_klass_array;  // Canonicalized klass obj array
@@ -374,6 +377,9 @@ class Universe: AllStatic {
   static oop out_of_memory_error_gc_overhead_limit()  { return gen_out_of_memory_error(_out_of_memory_error_gc_overhead_limit);  }
   static oop out_of_memory_error_realloc_objects()    { return gen_out_of_memory_error(_out_of_memory_error_realloc_objects);  }
   static oop delayed_stack_overflow_error_message()   { return _delayed_stack_overflow_error_message; }
+
+  // special exception used for killing thread
+  static oop tenant_death_exception()               { return _tenant_death_exception; }
 
   // Accessors needed for fast allocation
   static Klass** boolArrayKlassObj_addr()           { return &_boolArrayKlassObj;   }

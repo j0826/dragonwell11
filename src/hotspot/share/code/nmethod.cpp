@@ -405,6 +405,7 @@ void nmethod::init_defaults() {
   _stack_traversal_mark       = 0;
   _unload_reported            = false; // jvmti state
   _is_far_code                = false; // nmethods are located in CodeCache
+  _seen_on_stack              = false;
 
 #ifdef ASSERT
   _oops_are_stale             = false;
@@ -556,6 +557,7 @@ nmethod::nmethod(
   ByteSize basic_lock_sp_offset,
   OopMapSet* oop_maps )
   : CompiledMethod(method, "native nmethod", type, nmethod_size, sizeof(nmethod), code_buffer, offsets->value(CodeOffsets::Frame_Complete), frame_size, oop_maps, false),
+  _eagerly_retired_by_dead_classes(false),
   _native_receiver_sp_offset(basic_lock_owner_sp_offset),
   _native_basic_lock_sp_offset(basic_lock_sp_offset)
 {
@@ -662,6 +664,7 @@ nmethod::nmethod(
 #endif
   )
   : CompiledMethod(method, "nmethod", type, nmethod_size, sizeof(nmethod), code_buffer, offsets->value(CodeOffsets::Frame_Complete), frame_size, oop_maps, false),
+  _eagerly_retired_by_dead_classes(false),
   _native_receiver_sp_offset(in_ByteSize(-1)),
   _native_basic_lock_sp_offset(in_ByteSize(-1))
 {
@@ -990,6 +993,11 @@ void nmethod::mark_as_seen_on_stack() {
   // Set the traversal mark to ensure that the sweeper does 2
   // cleaning passes before moving to zombie.
   set_stack_traversal_mark(NMethodSweeper::traversal_count());
+}
+
+bool nmethod::is_seen_on_stack() {
+  assert(TenantThreadStop && SafepointSynchronize::is_at_safepoint(), "pre-condition");
+  return _seen_on_stack;
 }
 
 // Tell if a non-entrant method can be converted to a zombie (i.e.,
@@ -1482,6 +1490,32 @@ bool nmethod::do_unloading_scopes(BoolObjectClosure* is_alive) {
       return true;
     }
   }
+
+  // if any dead classloaders found in constant table, unload this nmethod as well
+  if (TenantThreadStop && !is_seen_on_stack()
+      && !is_locked_by_vm() && this->is_alive()
+      && SafepointSynchronize::is_at_full_gc_pause()
+      // 'eagerly retired' methods will be marked as not_entrant at SafepointSynchronize::end()
+      && !is_eagerly_retired_by_dead_classes()) {
+    IsTenantClassLoaderAlive is_loader_alive;
+    for (oop* p = oops_begin(); p < oops_end(); p++) {
+      if (*p == Universe::non_oop_word())  continue;  // skip non-oops
+      oop obj = *p;
+      if (obj != NULL && !is_loader_alive.do_object_b(obj)) {
+        if (TraceEagerlyPurgeDeadOops) {
+          ResourceMark rm;
+          tty->print_cr("Eagerly unload method: %s@" INTPTR_FORMAT " due to dead oops %s@" INTPTR_FORMAT,
+                        method()->name_and_sig_as_C_string(),
+                        p2i(this),
+                        obj->klass()->external_name(),
+                        p2i(obj));
+        }
+        make_unloaded(obj);
+        return true;
+      }
+    }
+  }
+
   return false;
 }
 
@@ -1596,6 +1630,60 @@ void nmethod::oops_do(OopClosure* f, bool allow_zombie) {
   for (oop* p = oops_begin(); p < oops_end(); p++) {
     if (*p == Universe::non_oop_word())  continue;  // skip non-oops
     f->do_oop(p);
+  }
+
+  // remove dead oops from constant table and clear dependencies
+  if (TenantThreadStop && method() != NULL
+      && (is_java_method() || is_osr_method())
+      && Universe::heap()->is_marking_gc_roots_stw()) {
+    IsTenantClassLoaderAlive is_alive;
+    purge_dead_oops(&is_alive);
+    if (is_alive.found_any()) {
+      set_eagerly_retired_by_dead_classes();
+      SafepointSynchronize::set_should_clear_nmethods(true);
+    }
+  }
+}
+
+void nmethod::purge_dead_oops(BoolObjectClosure* is_alive) {
+  assert(TenantThreadStop && !is_native_method(), "pre-condition");
+
+  if (is_alive != NULL) {
+    oop loader = method()->method_holder()->class_loader();
+    for (oop* p = oops_begin(); p < oops_end(); p++) {
+      if (p != NULL && *p != Universe::non_oop_word()) {
+        oop obj = RawAccess<>::oop_load(p);
+        if (obj != NULL && !is_alive->do_object_b(obj)) {
+          // only purge oops which is different from holder class' classloader,
+          // in which case, dead oops can only be callee method's classloader (non-root tenant),
+          // it is generally safe to purge it after tenant destroyed.
+          if (obj != loader) {
+            if (TraceEagerlyPurgeDeadOops) {
+              ResourceMark rm;
+              tty->print_cr("Purged oop %s@" INTPTR_FORMAT " from nmethod %s@" INTPTR_FORMAT "%s",
+                             obj->klass()->external_name(),
+                             p2i(obj),
+                             method()->name_and_sig_as_C_string(),
+                             p2i(this),
+                             is_osr_method() ? "(OSR)" : "");
+            }
+            *p = (oop)Universe::non_oop_word();
+          } else {
+            // if dead oop is the classloader of holderclass, skip it.
+            // otherwise may probably leads to invalid pointers pointing to eagerly reclaimed memory of Method
+            if (TraceEagerlyPurgeDeadOops) {
+              ResourceMark rm;
+              tty->print_cr("Failed to purge oop %s@" INTPTR_FORMAT " from nmethod %s@" INTPTR_FORMAT "%s due to holder class' loader",
+                             obj->klass()->external_name(),
+                             p2i(obj),
+                             method()->name_and_sig_as_C_string(),
+                             p2i(this),
+                             is_osr_method() ? "(OSR)" : "");
+            }
+          }
+        }
+      }
+    }
   }
 }
 
@@ -1905,6 +1993,9 @@ void nmethod::check_all_dependencies(DepChange& changes) {
 }
 
 bool nmethod::check_dependency_on(DepChange& changes) {
+  if (TenantThreadStop && is_eagerly_retired_by_dead_classes()) {
+    return false;
+  }
   // What has happened:
   // 1) a new class dependee has been added
   // 2) dependee and all its super classes have been marked
@@ -2961,3 +3052,8 @@ char* nmethod::jvmci_installed_code_name(char* buf, size_t buflen) {
   return NULL;
 }
 #endif
+
+void nmethod::set_eagerly_retired_by_dead_classes() {
+  assert(TenantThreadStop && SafepointSynchronize::is_at_safepoint(), "pre-condition");
+  _eagerly_retired_by_dead_classes = true;
+}

@@ -25,6 +25,8 @@
 
 package javax.management;
 
+import com.alibaba.tenant.TenantContainer;
+import com.alibaba.tenant.TenantGlobals;
 import com.sun.jmx.defaults.JmxProperties;
 import static com.sun.jmx.defaults.JmxProperties.JMX_INITIAL_BUILDER;
 import static com.sun.jmx.defaults.JmxProperties.MBEANSERVER_LOGGER;
@@ -361,10 +363,10 @@ public class MBeanServerFactory {
         checkPermission("findMBeanServer");
 
         if (agentId == null)
-            return new ArrayList<MBeanServer>(mBeanServerList);
+            return new ArrayList<MBeanServer>(getMBeanServerList());
 
         ArrayList<MBeanServer> result = new ArrayList<MBeanServer>();
-        for (MBeanServer mbs : mBeanServerList) {
+        for (MBeanServer mbs : getMBeanServerList()) {
             String name = mBeanServerId(mbs);
             if (agentId.equals(name))
                 result.add(mbs);
@@ -415,11 +417,11 @@ public class MBeanServerFactory {
     }
 
     private static synchronized void addMBeanServer(MBeanServer mbs) {
-        mBeanServerList.add(mbs);
+        getMBeanServerList().add(mbs);
     }
 
     private static synchronized void removeMBeanServer(MBeanServer mbs) {
-        boolean removed = mBeanServerList.remove(mbs);
+        boolean removed = getMBeanServerList().remove(mbs);
         if (!removed) {
             MBEANSERVER_LOGGER.log(Level.TRACE,
                     "MBeanServer was not in list!");
@@ -429,6 +431,15 @@ public class MBeanServerFactory {
 
     private static final ArrayList<MBeanServer> mBeanServerList =
             new ArrayList<MBeanServer>();
+
+    private static ArrayList<MBeanServer> getMBeanServerList() {
+        if (TenantGlobals.isDataIsolationEnabled() && TenantContainer.current() != null) {
+            return TenantContainer.current().getFieldValue(MBeanServerFactory.class, "mBeanServerList",
+                    () -> new ArrayList<>());
+        } else {
+            return mBeanServerList;
+        }
+    }
 
     /**
      * Load the builder class through the context class loader.

@@ -439,8 +439,12 @@ JVM_handle_linux_signal(int sig,
           address next_pc = Assembler::locate_next_instruction(pc);
           stub = SharedRuntime::handle_unsafe_access(thread, next_pc);
         }
-      }
-      else
+      } else if ((MultiTenant && TenantThreadStop) && sig == SIGSEGV && info->si_code == SEGV_ACCERR
+                 && TenantStopRecorder::is_no_touch_address((address)info->si_addr)) {
+        // If tenant thread stop is enabled, a SEGV is triggered when park is performed.
+        // This piece of code catches the SEGV and convert it to an exception.
+        stub = StubRoutines::handler_for_tenant_stop_exception();
+      } else
 
 #ifdef AMD64
       if (sig == SIGFPE  &&

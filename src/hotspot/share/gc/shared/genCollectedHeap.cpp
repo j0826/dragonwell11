@@ -584,6 +584,12 @@ void GenCollectedHeap::do_collection(bool           full,
     GCTraceCPUTime tcpu;
     GCTraceTime(Info, gc) t(gc_string, NULL, gc_cause(), true);
 
+    if (TenantThreadStop) {
+      // must traverse CodeCache and purge nmethods with dead oops
+      // guarantee full GC to do CodeCache::do_unloading for all off stack nmethods.
+      SafepointSynchronize::set_at_full_gc_pause(complete);
+    }
+
     gc_prologue(complete);
     increment_total_collections(complete);
 

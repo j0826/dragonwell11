@@ -24,6 +24,7 @@
  */
 
 package java.lang;
+import com.alibaba.tenant.TenantContainer;
 import jdk.internal.misc.TerminatingThreadLocal;
 
 import java.lang.ref.*;
@@ -251,6 +252,9 @@ public class ThreadLocal<T> {
      * @return the map
      */
     ThreadLocalMap getMap(Thread t) {
+        if (Thread.isCallingFromRootTenantToNonRoot()) {
+            return TenantContainer.current().getFieldValue(t, "threadLocals");
+        }
         return t.threadLocals;
     }
 
@@ -262,7 +266,12 @@ public class ThreadLocal<T> {
      * @param firstValue value for the initial entry of the map
      */
     void createMap(Thread t, T firstValue) {
-        t.threadLocals = new ThreadLocalMap(this, firstValue);
+        if (Thread.isCallingFromRootTenantToNonRoot()) {
+            TenantContainer.current().getFieldValue(t, "threadLocals",
+                    () -> new ThreadLocalMap(this, firstValue));
+        } else {
+            t.threadLocals = new ThreadLocalMap(this, firstValue);
+        }
     }
 
     /**

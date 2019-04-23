@@ -821,7 +821,9 @@ IRT_ENTRY(void, InterpreterRuntime::new_illegal_monitor_state_exception(JavaThre
   Handle exception(thread, thread->vm_result());
   assert(exception() != NULL, "vm result should be set");
   thread->set_vm_result(NULL); // clear vm result before continuing (may cause memory leaks and assert failures)
-  if (!exception->is_a(SystemDictionary::ThreadDeath_klass())) {
+  if (!(exception->is_a(SystemDictionary::ThreadDeath_klass())
+      && !(MultiTenant && TenantThreadStop
+           && exception->is_a(SystemDictionary::com_alibaba_tenant_TenantDeathException_klass())))) {
     exception = get_preinitialized_exception(
                        SystemDictionary::IllegalMonitorStateException_klass(),
                        CATCH);

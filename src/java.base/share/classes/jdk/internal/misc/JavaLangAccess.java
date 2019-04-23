@@ -305,4 +305,17 @@ public interface JavaLangAccess {
      * @throws IllegalArgumentException for malformed surrogates
      */
     byte[] getBytesUTF8NoRepl(String s);
+
+    /**
+     * Dispose a tenant classloader object
+     * @param cl    the dead classloader object
+     */
+    void disposeTenantClassLoader(ClassLoader cl);
+
+    /**
+     * Set the value of {@code Thread.childShouldInheritTenant}
+     * @param thread  target thread to be modified
+     * @param shouldInherit   new value of {@code thread.childShouldInheritTenant}
+     */
+    void setChildShouldInheritTenant(Thread thread, boolean shouldInherit);
 }

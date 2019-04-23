@@ -1605,6 +1605,7 @@ int java_lang_Thread::_tid_offset = 0;
 int java_lang_Thread::_thread_status_offset = 0;
 int java_lang_Thread::_park_blocker_offset = 0;
 int java_lang_Thread::_park_event_offset = 0 ;
+int java_lang_Thread::_inheritedTenantContainer_offset = 0 ;
 
 #define THREAD_FIELDS_DO(macro) \
   macro(_name_offset,          k, vmSymbols::name_name(), string_signature, false); \
@@ -1619,7 +1620,8 @@ int java_lang_Thread::_park_event_offset = 0 ;
   macro(_tid_offset,           k, "tid", long_signature, false); \
   macro(_thread_status_offset, k, "threadStatus", int_signature, false); \
   macro(_park_blocker_offset,  k, "parkBlocker", object_signature, false); \
-  macro(_park_event_offset,    k, "nativeParkEventPointer", long_signature, false)
+  macro(_park_event_offset,    k, "nativeParkEventPointer", long_signature, false); \
+  macro(_inheritedTenantContainer_offset, k, vmSymbols::inheritedTenantContainer_name(), vmSymbols::tenantcontainer_signature, false)
 
 void java_lang_Thread::compute_offsets() {
   assert(_group_offset == 0, "offsets should be initialized only once");
@@ -1703,6 +1705,9 @@ oop java_lang_Thread::inherited_access_control_context(oop java_thread) {
   return java_thread->obj_field(_inheritedAccessControlContext_offset);
 }
 
+oop java_lang_Thread::inherited_tenant_container(oop java_thread) {
+  return java_thread->obj_field(_inheritedTenantContainer_offset);
+}
 
 jlong java_lang_Thread::stackSize(oop java_thread) {
   if (_stackSize_offset > 0) {
@@ -4030,11 +4035,32 @@ oop java_security_AccessControlContext::create(objArrayHandle context, bool isPr
   return result;
 }
 
+// Support for java_security_ProtectionDomain
+
+int java_security_ProtectionDomain::class_loader_offset = 0;
+
+#define PROTECTIONDOMAIN_FIELDS_DO(macro) \
+  macro(class_loader_offset,      k, "classloader",      classloader_signature, false);
+
+void java_security_ProtectionDomain::compute_offsets() {
+  assert(class_loader_offset == 0, "offsets should be initialized only once");
+  fieldDescriptor fd;
+  InstanceKlass* k = InstanceKlass::cast(SystemDictionary::ProtectionDomain_klass());
+  PROTECTIONDOMAIN_FIELDS_DO(FIELD_COMPUTE_OFFSET);
+}
+
+oop java_security_ProtectionDomain::class_loader(Handle pd) {
+  assert(pd.not_null() && pd->klass() == SystemDictionary::ProtectionDomain_klass(), "Invalid type");
+  assert(class_loader_offset != 0, "Should be set");
+  return pd->obj_field(class_loader_offset);
+}
+
 
 // Support for java_lang_ClassLoader
 
 bool java_lang_ClassLoader::offsets_computed = false;
 int  java_lang_ClassLoader::_loader_data_offset = -1;
+int  java_lang_ClassLoader::is_dead_offset = -1;
 int  java_lang_ClassLoader::parallelCapable_offset = -1;
 int  java_lang_ClassLoader::name_offset = -1;
 int  java_lang_ClassLoader::nameAndId_offset = -1;
@@ -4055,7 +4081,8 @@ ClassLoaderData* java_lang_ClassLoader::cmpxchg_loader_data(ClassLoaderData* new
   macro(name_offset,            k1, vmSymbols::name_name(), string_signature, false); \
   macro(nameAndId_offset,       k1, "nameAndId",            string_signature, false); \
   macro(unnamedModule_offset,   k1, "unnamedModule",        module_signature, false); \
-  macro(parent_offset,          k1, "parent",               classloader_signature, false)
+  macro(parent_offset,          k1, "parent",               classloader_signature, false); \
+  macro(is_dead_offset,         k1, "isDead",               bool_signature, false)
 
 void java_lang_ClassLoader::compute_offsets() {
   assert(!offsets_computed, "offsets should be initialized only once");
@@ -4117,6 +4144,10 @@ bool java_lang_ClassLoader::is_instance(oop obj) {
   return obj != NULL && is_subclass(obj->klass());
 }
 
+bool java_lang_ClassLoader::is_dead(oop loader) {
+  assert(loader != NULL && oopDesc::is_oop(loader), "loader must be oop");
+  return JNI_TRUE == loader->bool_field(is_dead_offset);
+}
 
 // For class loader classes, parallelCapable defined
 // based on non-null field
@@ -4510,6 +4541,7 @@ void JavaClasses::compute_offsets() {
   java_lang_invoke_CallSite::compute_offsets();
   java_lang_invoke_MethodHandleNatives_CallSiteContext::compute_offsets();
   java_security_AccessControlContext::compute_offsets();
+  java_security_ProtectionDomain::compute_offsets();
   // Initialize reflection classes. The layouts of these classes
   // changed with the new reflection implementation in JDK 1.4, and
   // since the Universe doesn't know what JDK version it is until this
