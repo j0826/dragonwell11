@@ -56,9 +56,17 @@
                                                                             \
   product(bool, TenantCpuAccounting, false,                                 \
           "Enable cpu accounting per tenant")                               \
-
-  //add new AJDK specific flags here
-
+                                                                            \
+  product(bool, EnableCoroutine, false,                                     \
+          "Enable coroutine support")                                       \
+                                                                            \
+  product(uintx, DefaultCoroutineStackSize, 128*K,                          \
+          "Default size of stack that is associated with new coroutine")    \
+                                                                            \
+  product(uintx, MaxFreeCoroutinesCacheSize, 20,                            \
+          "The max number of free coroutine stacks a thread can keep")      \
+                                                                            \
+//add new AJDK specific flags here
 
 AJDK_FLAGS(DECLARE_DEVELOPER_FLAG, DECLARE_PD_DEVELOPER_FLAG, DECLARE_PRODUCT_FLAG, DECLARE_PD_PRODUCT_FLAG, DECLARE_DIAGNOSTIC_FLAG, DECLARE_EXPERIMENTAL_FLAG, DECLARE_NOTPRODUCT_FLAG, DECLARE_MANAGEABLE_FLAG, DECLARE_PRODUCT_RW_FLAG, DECLARE_LP64_PRODUCT_FLAG)
 

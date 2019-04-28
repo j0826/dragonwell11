@@ -65,6 +65,7 @@
 #include "runtime/arguments.hpp"
 #include "runtime/atomic.hpp"
 #include "runtime/biasedLocking.hpp"
+#include "runtime/coroutine.hpp"
 #include "runtime/flags/jvmFlagConstraintList.hpp"
 #include "runtime/flags/jvmFlagRangeList.hpp"
 #include "runtime/flags/jvmFlagWriteableList.hpp"
@@ -1548,6 +1549,13 @@ void JavaThread::initialize() {
   _interp_only_mode    = 0;
   _special_runtime_exit_condition = _no_async_condition;
   _pending_async_exception = NULL;
+
+  _coroutine_stack_cache = NULL;
+  _coroutine_stack_cache_size = 0;
+  _coroutine_stack_list = NULL;
+  _coroutine_list = NULL;
+  _current_coroutine = NULL;
+
   _thread_stat = NULL;
   _thread_stat = new ThreadStatistics();
   _blocked_on_compilation = false;
@@ -1571,7 +1579,9 @@ void JavaThread::initialize() {
   // Setup safepoint state info for this thread
   ThreadSafepointState::create(this);
 
-  debug_only(_java_call_counter = 0);
+#ifdef ASSERT
+  _java_call_counter = 0;
+#endif
 
   // JVMTI PopFrame support
   _popframe_condition = popframe_inactive;
@@ -1672,6 +1682,16 @@ JavaThread::JavaThread(ThreadFunction entry_point, size_t stack_sz) :
 }
 
 JavaThread::~JavaThread() {
+  while (EnableCoroutine && coroutine_stack_cache() != NULL) {
+    CoroutineStack* stack = coroutine_stack_cache();
+    stack->remove_from_list(coroutine_stack_cache());
+    CoroutineStack::free_stack(stack, this);
+  }
+
+  while (EnableCoroutine && coroutine_list() != NULL) {
+     CoroutineStack::free_stack(coroutine_list()->stack(), this);
+     delete coroutine_list();
+  }
 
   // JSR166 -- return the parker to the free list
   Parker::Release(_parker);
@@ -1724,6 +1744,13 @@ void JavaThread::run() {
 
   // used to test validity of stack trace backs
   this->record_base_of_stack_pointer();
+
+  // Record real stack base and size.
+  this->record_stack_base_and_size();
+
+  if (EnableCoroutine) {
+    this->initialize_coroutine_support();
+  }
 
   this->create_stack_guard_pages();
 
@@ -2895,6 +2922,14 @@ void JavaThread::frames_do(void f(frame*, const RegisterMap* map)) {
     frame* fr = fst.current();
     f(fr, fst.register_map());
   }
+  if (EnableCoroutine) {
+    // traverse the coroutine stack frames
+    Coroutine* current = _coroutine_list;
+    do {
+      current->frames_do(f);
+      current = current->next();
+    } while (current != _coroutine_list);
+  }
 }
 
 
@@ -3035,6 +3070,14 @@ void JavaThread::oops_do(OopClosure* f, CodeBlobClosure* cf) {
     }
   }
 
+  if (EnableCoroutine) {
+    Coroutine* current = _coroutine_list;
+    do {
+      current->oops_do(f, cf);
+      current = current->next();
+    } while (current != _coroutine_list);
+  }
+
   // callee_target is never live across a gc point so NULL it here should
   // it still contain a methdOop.
 
@@ -3076,6 +3119,14 @@ void JavaThread::nmethods_do(CodeBlobClosure* cf) {
       fst.current()->nmethods_do(cf);
     }
   }
+
+  if (EnableCoroutine) {
+    Coroutine* current = _coroutine_list;
+    do {
+      current->nmethods_do(cf);
+      current = current->next();
+    } while (current != _coroutine_list);
+  }
 }
 
 void JavaThread::compiledMethods_do(CodeBlobClosure* cf) {
@@ -3106,6 +3157,13 @@ void JavaThread::metadata_do(void f(Metadata*)) {
     if (task != NULL) {
       task->metadata_do(f);
     }
+  }
+  if (EnableCoroutine) {
+    Coroutine* current = _coroutine_list;
+    do {
+      current->metadata_do(f);
+      current = current->next();
+    } while (current != _coroutine_list);
   }
 }
 
@@ -3948,6 +4006,10 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
   // must do this before set_active_handles
   main_thread->record_stack_base_and_size();
   main_thread->register_thread_stack_with_NMT();
+  if (EnableCoroutine) {
+    main_thread->initialize_coroutine_support();
+  }
+
   main_thread->set_active_handles(JNIHandleBlock::allocate_block());
 
   if (!main_thread->set_as_starting_thread()) {
@@ -5345,6 +5407,12 @@ TenantShutdownMark::~TenantShutdownMark() {
       && NULL != _thread) {
     _thread->unmask_tenant_shutdown();
   }
+}
+
+void JavaThread::initialize_coroutine_support() {
+  assert(EnableCoroutine, "EnableCoroutine isn't enable");
+  CoroutineStack::create_thread_stack(this)->insert_into_list(_coroutine_stack_list);
+  Coroutine::create_thread_coroutine(this, _coroutine_stack_list)->insert_into_list(_coroutine_list);
 }
 
 address TenantStopRecorder::_no_touch_page = 0;
