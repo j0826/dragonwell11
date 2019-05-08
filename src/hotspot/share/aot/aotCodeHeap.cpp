@@ -142,7 +142,7 @@ Klass* AOTCodeHeap::lookup_klass(const char* name, int len, const Method* method
   Klass* k = NULL;
   if (UseAppAOT) {
     /* app aot will load so library after loading klass, try to resolve it */
-    k = SystemDictionary::find_constrained_instance_or_array_klass(sym, loader, thread);
+    k = SystemDictionary::resolve_or_fail(sym, loader, protection_domain, true, thread);
     guarantee(!thread->has_pending_exception(), "should not throw");
   } else {
     k = SystemDictionary::find_instance_or_array_klass(sym, loader, protection_domain, thread);
@@ -833,6 +833,19 @@ bool AOTCodeHeap::load_klass_data(InstanceKlass* ik, Thread* thread) {
 
   assert(klass_data->_class_id < _class_count, "invalid class id");
   AOTClass* aot_class = &_classes[klass_data->_class_id];
+  if (UseAppAOT) {
+    // for class with aot compiled methods, we need check classloader is bound loader
+    if (klass_data->_compiled_methods_offset >= 0) {
+      ClassLoaderData *cld = ik->class_loader_data();
+      if (!cld->app_aot_enabled() || cld->aot_code_heap() != this) {
+        log_trace(aot, class, load)("class  %s loaded by classloader %p is not bind to aot heap %p tid=" INTPTR_FORMAT,
+                                    ik->internal_name(), ik->class_loader_data(), this,
+                                    p2i(thread));
+        NOT_PRODUCT( aot_klasses_cl_miss++; )
+        return false;
+      }
+    }
+  }
   if (aot_class->_classloader != NULL && aot_class->_classloader != ik->class_loader_data()) {
     log_trace(aot, class, load)("class  %s  in  %s already loaded for classloader %p vs %p tid=" INTPTR_FORMAT,
                                 ik->internal_name(), _lib->name(), aot_class->_classloader, ik->class_loader_data(), p2i(thread));
