@@ -3757,6 +3757,7 @@ static void call_initPhase3(TRAPS) {
 
   // VM.isBooted() is set in System.initPhase3(), and TenantContainer depends on that state
   if (MultiTenant) {
+    // initialize com.alibaba.tenant.TenantContainer
     klass =  SystemDictionary::resolve_or_fail(vmSymbols::com_alibaba_tenant_TenantContainer(), true, CHECK);
     JavaCalls::call_static(&result, klass, vmSymbols::initializeTenantContainerClass_name(),
                                            vmSymbols::void_method_signature(), CHECK);
@@ -4202,6 +4203,14 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
     ShouldNotReachHere();
   }
 
+  // initialize com.alibaba.tenant.JGroup, has to be done after full vm init
+  if (MultiTenant && (TenantCpuThrottling || TenantCpuAccounting)) {
+    Klass* klass =  SystemDictionary::resolve_or_fail(vmSymbols::com_alibaba_tenant_JGroup(), true, CHECK_JNI_ERR);
+    JavaValue result(T_VOID);
+    JavaCalls::call_static(&result, klass, vmSymbols::initializeJGroupClass_name(),
+                                           vmSymbols::void_method_signature(), CHECK_JNI_ERR);
+  }
+
   return JNI_OK;
 }
 
@@ -4489,6 +4498,20 @@ bool Threads::destroy_vm() {
 
   // run Java level shutdown hooks
   thread->invoke_shutdown_hooks();
+
+  // invoke JGroup.destroyJGroupClass!
+  if (TenantCpuThrottling || TenantCpuAccounting) {
+    EXCEPTION_MARK;
+    Klass* klass =  SystemDictionary::resolve_or_null(vmSymbols::com_alibaba_tenant_JGroup(), THREAD);
+    if (klass != NULL) {
+      JavaValue result(T_VOID);
+      JavaCalls::call_static(&result,
+                             klass,
+                             vmSymbols::destroyJGroupClass_name(),
+                             vmSymbols::void_method_signature(),
+                             THREAD);
+    }
+  }
 
   before_exit(thread);
 

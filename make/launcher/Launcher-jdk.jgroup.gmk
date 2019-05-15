@@ -1,0 +1,8 @@
+
+include LauncherCommon.gmk
+
+ifeq ($(OPENJDK_TARGET_OS), linux)
+  $(eval $(call SetupBuildLauncher, jgroup, \
+      MAIN_CLASS := com.alibaba.ajdk.tools.jgroup.JGroupMain, \
+  ))
+endif

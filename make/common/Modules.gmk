@@ -125,10 +125,15 @@ ifeq ($(OPENJDK_TARGET_OS), solaris)
   PLATFORM_MODULES += jdk.crypto.ucrypto
 endif
 
+ifeq ($(OPENJDK_TARGET_OS), linux)
+  PLATFORM_MODULES += jdk.jgroup
+endif
+
 JRE_TOOL_MODULES += \
     jdk.jdwp.agent \
     jdk.pack \
     jdk.scripting.nashorn.shell \
+    jdk.jgroup \
     #
 
 ################################################################################

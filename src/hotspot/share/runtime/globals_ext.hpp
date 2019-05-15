@@ -37,10 +37,10 @@
           "Use AOT for app class loader")                                   \
                                                                             \
   product(bool, MultiTenant, false,                                         \
-            "Enable the multi-tenant feature.")                             \
+          "Enable the multi-tenant feature.")                               \
                                                                             \
   product(bool, TenantDataIsolation, false,                                 \
-             "Enable data isolation(e.g static vairable) per tenant")       \
+          "Enable data isolation(e.g static vairable) per tenant")          \
                                                                             \
   product(bool, TenantThreadStop, false,                                    \
           "Stop all spawned threads when calling TenantContainer.destroy()")\
@@ -51,6 +51,12 @@
   diagnostic(bool, TraceEagerlyPurgeDeadOops, false,                        \
           "Trace eagerly purging dead oops")                                \
                                                                             \
+  product(bool, TenantCpuThrottling, false,                                 \
+          "Enable cpu throttling per tenant")                               \
+                                                                            \
+  product(bool, TenantCpuAccounting, false,                                 \
+          "Enable cpu accounting per tenant")                               \
+
   //add new AJDK specific flags here
 
 

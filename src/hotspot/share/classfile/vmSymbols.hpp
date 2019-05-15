@@ -591,6 +591,8 @@
   template(init_lock_name,                            "<init_lock>")                              \
   template(inheritedTenantContainer_name,             "inheritedTenantContainer")                 \
   template(initializeTenantContainerClass_name,       "initializeTenantContainerClass")           \
+  template(initializeJGroupClass_name,                "initializeJGroupClass")                    \
+  template(destroyJGroupClass_name,                   "destroyJGroupClass")                       \
                                                                                                   \
   /* name symbols needed by intrinsics */                                                         \
   VM_INTRINSICS_DO(VM_INTRINSIC_IGNORE, VM_SYMBOL_IGNORE, template, VM_SYMBOL_IGNORE, VM_ALIAS_IGNORE) \

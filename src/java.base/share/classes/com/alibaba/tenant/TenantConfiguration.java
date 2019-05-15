@@ -73,30 +73,65 @@ public class TenantConfiguration {
     }
 
     /**
-     * @param maxCPUPercent
-     * @param cpuShare
-     * @param maxHeap
+     * Use cgroup's cpu.cfs_* controller to limit cpu time of
+     * new {@code TenantContainer} object created from this configuration
+     * @param period    corresponding to cpu.cfs_period
+     * @param quota     corresponding to cpu.cfs_quota
+     * @return current {@code TenantConfiguration}
      */
-    @Deprecated
-    public TenantConfiguration(int maxCPUPercent, int cpuShare, long maxHeap) {
-        // TODO
+    public TenantConfiguration limitCpuCfs(int period, int quota) {
+        if (!TenantGlobals.isCpuThrottlingEnabled()) {
+            throw new UnsupportedOperationException("-XX:+TenantCpuThrottling is not enabled");
+        }
+        // according to https://www.kernel.org/doc/Documentation/scheduler/sched-bwc.txt
+        // cpu.cfs_period_us should be in range [1 ms, 1 sec]
+        if (period < 1_000 || period > 1_000_000
+                // 'quota' should never be less than 1ms as well, but can exceed 'period' which means multiple cores
+                // 'quota' == -1 means no limit
+                || (quota < 1_000 && quota != -1)) {
+            throw new IllegalArgumentException("Illegal CPU_CFS limit " + NativeDispatcher.CG_CPU_CFS_PERIOD + " = "
+                    + period + ", " + NativeDispatcher.CG_CPU_CFS_QUOTA + " =" + quota);
+        }
+        limits.put(ResourceType.CPU_CFS, new CpuCfsLimit(period, quota));
+        return this;
     }
 
     /**
-     * @param cpuShare
-     * @param maxHeapBytes
+     * Use cgroup's cpu.shares controller to limit cpu shares of
+     * new {@code TenantContainer} object created from this configuration
+     * @param share relative weight of cpu shares
+     * @return current {@code TenantConfiguration}
      */
-    @Deprecated
-    public TenantConfiguration(int cpuShare, long maxHeapBytes) {
-        // TODO
+    public TenantConfiguration limitCpuShares(int share) {
+        if (!TenantGlobals.isCpuThrottlingEnabled()) {
+            // use warning messages instead of exception here to keep backward compatibility
+            System.err.println("WARNING: -XX:+TenantCpuThrottling is disabled!");
+            //throw new UnsupportedOperationException("-XX:+TenantCpuThrottling is not enabled");
+        }
+        if (share < 0) {
+            throw new IllegalArgumentException("Illegal CPU_SHARES limit "
+                    + NativeDispatcher.CG_CPU_SHARES + " = " + share);
+        }
+        limits.put(ResourceType.CPU_SHARES, new CpuShareLimit(share));
+        return this;
     }
 
     /**
-     * @param maxHeapBytes
+     * Use cgroup's cpu.cpuset controller to limit cpu cores allowed to be used
+     * by new {@code TenantContainer} object created from this configuration
+     * @param cpuSets string of cpuset description, such as "1,2,3", "0-7,11"
+     * @return current {@code TenantConfiguration}
      */
-    @Deprecated
-    public TenantConfiguration(long maxHeapBytes) {
-        // TODO
+    public TenantConfiguration limitCpuSet(String cpuSets) {
+        if (!TenantGlobals.isCpuThrottlingEnabled()) {
+            throw new UnsupportedOperationException("-XX:+TenantCpuThrottling is not enabled");
+        }
+        if (cpuSets == null || cpuSets.isEmpty()) {
+            throw new IllegalArgumentException("Illegal CPUSET_CPUS limit "
+                    + NativeDispatcher.CG_CPUSET_CPUS + " = " + cpuSets);
+        }
+        limits.put(ResourceType.CPUSET_CPUS, new CpuSetLimit(cpuSets));
+        return this;
     }
 
     /*
@@ -125,5 +160,147 @@ public class TenantConfiguration {
      */
     void setLimit(ResourceType type, ResourceLimit limit) {
         limits.put(type, limit);
+    }
+
+    /**
+     * @see TenantConfiguration#getMaxCpuPercent()
+     */
+    @Deprecated
+    public int getMaxCPU() {
+        return getMaxCpuPercent();
+    }
+
+    /**
+     * Corresponding to combination of Linux cgroup's cpu.cfs_period_us and cpu.cfs_quota_us
+     * @return the max percent of cpu the tenant is allowed to consume, -1 means unlimited
+     */
+    public int getMaxCpuPercent() {
+        if (limits.containsKey(ResourceType.CPU_CFS)) {
+            CpuCfsLimit limit = (CpuCfsLimit) limits.get(ResourceType.CPU_CFS);
+            int period = limit.cpuCfsPeriod;
+            int quota = limit.cpuCfsQuota;
+            if (period > 0 && quota > 0) {
+                return (int) (((float) quota / (float) period) * 100);
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * @see TenantConfiguration#getCpuShares()
+     */
+    @Deprecated
+    public int getWeight() {
+        return getCpuShares();
+    }
+
+    /**
+     * Corresponding to Linux cgroup's cpu.shares
+     * @return the weight, impact the ratio of cpu among all tenants.
+     */
+    public int getCpuShares() {
+        if (limits.containsKey(ResourceType.CPU_SHARES)) {
+            CpuShareLimit limit = (CpuShareLimit)limits.get(ResourceType.CPU_SHARES);
+            return limit.cpuShare;
+        }
+        return 0;
+    }
+
+    /**
+     * Corresponding to Linux cgroup's cpuset.cpus
+     * @return
+     */
+    public String getCpuSet() {
+        if (limits.containsKey(ResourceType.CPUSET_CPUS)) {
+            CpuSetLimit limit = (CpuSetLimit)limits.get(ResourceType.CPUSET_CPUS);
+            return limit.cpus;
+        }
+        return null;
+    }
+
+    // ------------- implementation of resource limitations ----------------
+
+    // Implementation of cpu.share limits
+    private static class CpuShareLimit implements ResourceLimit {
+        private int cpuShare;
+
+        CpuShareLimit(int share) {
+            cpuShare = share;
+        }
+
+        @Override public ResourceType type() {
+            return ResourceType.CPU_SHARES;
+        }
+
+        @Override
+        public void sync(JGroup jgroup) {
+            if (NativeDispatcher.IS_CPU_SHARES_ENABLED) {
+                jgroup.setValue(NativeDispatcher.CG_CPU_SHARES, Integer.toString(cpuShare));
+            }
+        }
+
+        @Override
+        public String toString() {
+            return NativeDispatcher.CG_CPU_SHARES + " = " + cpuShare;
+        }
+    }
+
+    // Implementation of CPUCFS limit
+    private static class CpuCfsLimit implements ResourceLimit {
+        private int cpuCfsPeriod;
+        private int cpuCfsQuota;
+
+        CpuCfsLimit(int period, int quota) {
+            cpuCfsPeriod = period;
+            cpuCfsQuota = quota;
+        }
+
+        @Override public ResourceType type() {
+            return ResourceType.CPU_CFS;
+        }
+
+        @Override
+        public void sync(JGroup jgroup) {
+            if (NativeDispatcher.IS_CPU_CFS_ENABLED) {
+                jgroup.setValue(NativeDispatcher.CG_CPU_CFS_PERIOD, Integer.toString(cpuCfsPeriod));
+                jgroup.setValue(NativeDispatcher.CG_CPU_CFS_QUOTA, Integer.toString(cpuCfsQuota));
+            }
+        }
+
+        @Override
+        public String toString() {
+            return NativeDispatcher.CG_CPU_CFS_PERIOD + " = " + cpuCfsPeriod + ", "
+                    + NativeDispatcher.CG_CPU_CFS_QUOTA + " = " + cpuCfsQuota;
+        }
+    }
+
+    // implementation of CPUSET_CPUS limit
+    private static class CpuSetLimit implements ResourceLimit {
+        private static final int MAX_CPUS = Runtime.getRuntime().availableProcessors();
+        // String representation of cpuset.cpus limit, like "0-7"
+        String cpus;
+
+        CpuSetLimit(String cpus) {
+            if ( cpus == null || cpus.isEmpty()) {
+                throw new IllegalArgumentException("Cpuset must be between 0 and " + MAX_CPUS);
+            }
+            this.cpus = cpus;
+        }
+
+        @Override public ResourceType type() {
+            return ResourceType.CPUSET_CPUS;
+        }
+
+        @Override
+        public void sync(JGroup jgroup) {
+            if (NativeDispatcher.IS_CPUSET_ENABLED) {
+                jgroup.setValue(NativeDispatcher.CG_CPUSET_CPUS, cpus);
+            }
+        }
+
+        @Override
+        public String toString() {
+            return NativeDispatcher.CG_CPUSET_CPUS + " = " + cpus;
+        }
     }
 }

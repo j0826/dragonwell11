@@ -38,7 +38,7 @@ public class TestClinitWhileTenantDestroy {
     static CountDownLatch cdl = new CountDownLatch(1);
 
     public static void main(String[] args) {
-        TenantConfiguration config = new TenantConfiguration(1024, 64 * 1024 * 1024);
+        TenantConfiguration config = new TenantConfiguration();
         TenantContainer tenant = TenantContainer.create(config);
         Thread[] initializerThread = new Thread[1];
 

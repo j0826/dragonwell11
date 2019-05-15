@@ -636,7 +636,7 @@ public class TestKillThread {
 
     private void testNotKillRootThreads() {
         msg(">> testNotKillRootThreads()");
-        TenantConfiguration config = new TenantConfiguration(1024, 64 * 1024 * 1024);
+        TenantConfiguration config = new TenantConfiguration();
         TenantContainer tenant = TenantContainer.create(config);
         CountDownLatch latch = new CountDownLatch(1);
         AtomicBoolean endTest = new AtomicBoolean(false);
@@ -697,7 +697,7 @@ public class TestKillThread {
         setUp();
 
         // kill thread created from a tenant container;
-        TenantConfiguration config = new TenantConfiguration(10, HEAP_REGION_SIZE << 3);
+        TenantConfiguration config = new TenantConfiguration();
         TenantContainer tenant = TenantContainer.create(config);
         final Thread[] threads = new Thread[1];
         try {
@@ -752,7 +752,7 @@ public class TestKillThread {
         setUp();
 
         // kill thread created from a tenant container;
-        TenantConfiguration config = new TenantConfiguration(10, HEAP_REGION_SIZE << 3);
+        TenantConfiguration config = new TenantConfiguration();
         TenantContainer tenant = TenantContainer.create(config);
 
         List<Thread> poolThreads = new ArrayList<>(1);
@@ -811,7 +811,7 @@ public class TestKillThread {
 
         setUp(tasks.size());
 
-        TenantConfiguration config = new TenantConfiguration(10, HEAP_REGION_SIZE << 3);
+        TenantConfiguration config = new TenantConfiguration();
         TenantContainer tenant = TenantContainer.create(config);
         final List<Thread> threads = new ArrayList<>();
 

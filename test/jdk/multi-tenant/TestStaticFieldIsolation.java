@@ -127,7 +127,7 @@ public class TestStaticFieldIsolation {
 
     // convenient static method to create a simple {@code TenantContainer} object
     private static TenantContainer createSimpleTenant() {
-        TenantConfiguration config = new TenantConfiguration(1024, 64 * 1024 * 1024);
+        TenantConfiguration config = new TenantConfiguration();
         return TenantContainer.create(config);
     }
 }

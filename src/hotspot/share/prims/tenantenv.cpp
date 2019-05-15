@@ -38,20 +38,6 @@ tenant_GetTenantFlags(TenantEnv *env, jclass cls)
     result |= TENANT_FLAG_MULTI_TENANT_ENABLED;
   }
 
-  /*
-  if (TenantHeapThrottling) {
-    result |= TENANT_FLAG_HEAP_THROTTLING_ENABLED;
-  }
-
-  if (TenantCpuThrottling) {
-    result |= TENANT_FLAG_CPU_THROTTLING_ENABLED;
-  }
-
-  if (TenantSocketThrottling) {
-    result |= TENANT_FLAG_SOCKET_THROTTLING_ENABLED;
-  }
-  */
-
   if (TenantDataIsolation) {
     result |= TENANT_FLAG_DATA_ISOLATION_ENABLED;
   }
@@ -60,13 +46,25 @@ tenant_GetTenantFlags(TenantEnv *env, jclass cls)
     result |= TENANT_FLAG_THREAD_STOP_ENABLED;
   }
 
-  /*
-  if (TenantIOHandleReclaim) {
-    result |= TENANT_FLAG_IOHANDLE_RECLAIMING_ENABLED;
-  }
-
   if (TenantCpuAccounting) {
     result |= TENANT_FLAG_CPU_ACCOUNTING_ENABLED;
+  }
+
+  if (TenantCpuThrottling) {
+    result |= TENANT_FLAG_CPU_THROTTLING_ENABLED;
+  }
+
+  /*
+  if (TenantSocketThrottling) {
+    result |= TENANT_FLAG_SOCKET_THROTTLING_ENABLED;
+  }
+
+  if (TenantHeapThrottling) {
+    result |= TENANT_FLAG_HEAP_THROTTLING_ENABLED;
+  }
+
+  if (TenantIOHandleReclaim) {
+    result |= TENANT_FLAG_IOHANDLE_RECLAIMING_ENABLED;
   }
 
   if (TenantHeapIsolation) {

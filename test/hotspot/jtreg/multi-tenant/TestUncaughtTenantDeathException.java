@@ -26,7 +26,7 @@ public class TestUncaughtTenantDeathException {
     // To test set/clear of property com.alibaba.tenant.PrintUncaughtTenantDeathException
     public static class TenantRunnerTask {
         public static void main(String[] args) throws TenantException, InterruptedException {
-            TenantConfiguration config = new TenantConfiguration(1024, 64 * 1024 * 1024);
+            TenantConfiguration config = new TenantConfiguration();
             TenantContainer tenant = TenantContainer.create(config);
             Thread[] t = new Thread[1];
             CountDownLatch c = new CountDownLatch(1);

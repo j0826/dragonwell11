@@ -71,7 +71,7 @@ public class SCDynamicConfigTest {
         System.out.println("SCDynamicConfig:\n");
         System.out.println(conf);
 
-        // Simulate SCDynamicConfig.getConfig() output
+        // Simulate SCDynamicConfig.getTenantConfig() output
         Method m = SCDynamicStoreConfig.class.getDeclaredMethod(
                 "convertNativeConfig", Hashtable.class);
         m.setAccessible(true);

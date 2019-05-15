@@ -7,7 +7,6 @@ import sun.security.action.GetLongAction;
 
 import java.lang.ref.WeakReference;
 import java.security.AccessController;
-import java.security.PrivilegedAction;
 import java.util.*;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Supplier;
@@ -275,7 +274,7 @@ public class TenantContainer {
      *     <li><b>com.alibaba.tenant.ShutdownSTWSoftLimit</b> Time limit (in millisecond) of accumulated JVM kill-thread
      *          operation time, {@code TenantContainer.destroy} will be blocked during this period;
      *          if there are still live threads after exceeding this limit,
-     *          {@code TenantContainer.destory} will return and a background thread will be started to kill thread in
+     *          {@code TenantContainer.destroy} will return and a background thread will be started to kill thread in
      *          asynchronous manner.
      *          -1 by default, which will block {@code TenantContainer.destroy()} infinitely
      *          until all spawned threads got killed.
@@ -324,7 +323,7 @@ public class TenantContainer {
                 }
             }
         } catch (Throwable t) {
-            System.err.println("Exception from TenantContainer.destory()");
+            System.err.println("Exception from TenantContainer.destroy()");
             t.printStackTrace();
         } finally {
             setState(TenantState.DEAD);
@@ -341,6 +340,11 @@ public class TenantContainer {
      *
      */
     private void cleanUp() {
+
+        if (jgroup != null) {
+            jgroup.destroy();
+            jgroup = null;
+        }
 
         if (TenantGlobals.isThreadStopEnabled()) {
             int cnt = 0;
@@ -725,12 +729,21 @@ public class TenantContainer {
             tc.props.put(key, sysProps.get(key));
         }
 
+        // cgroup for tenant
+        if (TenantGlobals.isCpuThrottlingEnabled() || TenantGlobals.isCpuAccountingEnabled()) {
+            tc.jgroup = new JGroup(tc);
+        }
+
         tenantContainerMap.put(tc.getTenantId(), tc);
         return tc;
     }
 
     TenantContainer getParent() {
         return parent;
+    }
+
+    JGroup getJGroup() {
+        return jgroup;
     }
 
     /**
