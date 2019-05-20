@@ -1,24 +1,54 @@
 #!/bin/bash
-if [ $# != 1 ]; then 
-  echo "USAGE: $0 release/debug"
+ARGNUM=$#
+if [ $ARGNUM != 1 -a $ARGNUM != 3 ]; then 
+  echo "USAGE: $0 release/debug or $0 release/debug username uid (docker mode)"
+  exit
+elif [ $# -eq 1 ]; then
+  PREBUILD=0
+else
+  PREBUILD=1
 fi
 
 DOCKER_IMAGE=reg.docker.alibaba-inc.com/ajdk/11.alios7
 SCRIPT_NAME=`basename $0`
 VERSION_UPDATE=3
+MX=`pwd`/mx/mx
+BUILD_UID=`id -u ${USER}`
 
 ps -e | grep docker
 if [ $? -eq 0 ]; then
     echo "We will build AJDK in Docker!"
     sudo docker pull $DOCKER_IMAGE
-    sudo docker run -u admin -i --rm -e BUILD_NUMBER=$BUILD_NUMBER -v `pwd`:`pwd` -w `pwd` \
-               --entrypoint=bash $DOCKER_IMAGE `pwd`/$SCRIPT_NAME $1
+    sudo docker run -i --rm -e BUILD_NUMBER=$BUILD_NUMBER -v `pwd`:`pwd` -w `pwd` \
+               --entrypoint=bash $DOCKER_IMAGE `pwd`/$SCRIPT_NAME $1 $USER $BUILD_UID
     exit $?
 fi
 
-
 LC_ALL=C
 BUILD_MODE=$1
+
+if [ $PREBUILD -eq 1 ]; then
+    # create user in docker image
+    BUILD_USER=$2
+    BUILD_UID=$3
+    if [ $BUILD_UID != "500" ]; then
+        BUILD_USER='buildadmin'   # fake build user
+        useradd -u $BUILD_UID -G users -d /tmp/${BUILD_USER}_home $BUILD_USER
+    else
+        BUILD_USER='admin' # 'admin' user exists in docker image
+    fi
+    sudo su $BUILD_USER `pwd`/$SCRIPT_NAME $BUILD_MODE
+    exit $?
+fi
+
+# update graal to openjdk
+WORKDIR=`pwd`
+cd graalvm/compiler
+$MX --java-home /vmfarm/ajdk11 updategraalinopenjdk $WORKDIR 11
+cd ../..
+
+# jaotc.test requires junit, now we can not run junit in build process
+rm -rf src/jdk.aot/share/classes/jdk.tools.jaotc.test
 
 case "$BUILD_MODE" in
     release)
@@ -61,6 +91,16 @@ bash ./configure --with-freetype=system \
                  --with-zlib=system \
                  --with-jvm-features=zgc
 make CONF=$BUILD_MODE LOG=cmdlines JOBS=8 images
+
+# recover modified components
+rm -rf src/jdk.internal.vm.compiler
+rm -rf src/jdk.aot
+rm -rf src/jdk.internal.vm.compiler.management
+rm -f make/CompileJavaModules.gmk
+git checkout src/jdk.internal.vm.compiler
+git checkout src/jdk.aot
+git checkout src/jdk.internal.vm.compiler.management
+git checkout make/CompileJavaModules.gmk
 
 \cp -f /vmfarm/tools/hsdis/8/amd64/hsdis-amd64.so  $NEW_JAVA_HOME/lib/
 \cp -f /vmfarm/tools/jemalloc/lib/libjemalloc.so.2 $NEW_JAVA_HOME/lib/
@@ -107,6 +147,10 @@ done
 \rm -f /tmp/systemProperty*
 
 ldd $NEW_JAVA_HOME/lib/libzip.so|grep libz
+if [ 0 != $? ]; then RET=1; fi
+
+# sanity check for jvmci compiler
+$NEW_JAVA_HOME/bin/java -XX:+UnlockExperimentalVMOptions -XX:+EnableJVMCI -XX:+UseJVMCICompiler -XX:+BootstrapJVMCI -version
 if [ 0 != $? ]; then RET=1; fi
 echo "================= Sanity test end ======================"
 
