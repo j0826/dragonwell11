@@ -409,6 +409,8 @@ class java_lang_Thread : AllStatic {
 
   static const char*  thread_status_name(oop java_thread_oop);
 
+  static int thread_status_offset() { return _thread_status_offset; }
+
   // Debugging
   friend class JavaClasses;
 };
@@ -1581,6 +1583,37 @@ public:
 
   // Debugging
   friend class JavaClasses;
+};
+
+class com_alibaba_wisp_engine_WispEngine: AllStatic {
+private:
+  static int _isInCritical_offset;
+public:
+  static bool in_critical(oop obj);
+
+  static void compute_offsets();
+};
+
+class com_alibaba_wisp_engine_WispTask: AllStatic {
+private:
+  static int _jvmParkStatus_offset;
+  static int _id_offset;
+  static int _threadWrapper_offset;
+  static int _interrupted_offset;
+  static int _activeCount_offset;
+  static int _stealCount_offset;
+  static int _stealFailureCount_offset;
+public:
+  static void set_jvmParkStatus(oop obj, jint status);
+  static int  get_id(oop obj);
+  static oop  get_threadWrapper(oop obj);
+  static int  get_interrupted(oop obj);
+  static void set_interrupted(oop obj, jint interrupted);
+  static int  get_activeCount(oop obj);
+  static int  get_stealCount(oop obj);
+  static int  get_stealFailureCount(oop obj);
+
+  static void compute_offsets();
 };
 
 // Interface to hard-coded offset checking

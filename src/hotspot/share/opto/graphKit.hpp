@@ -281,6 +281,7 @@ class GraphKit : public Phase {
   void add_safepoint_edges(SafePointNode* call,
                            bool must_throw = false);
 
+  void add_safepoint_edges_wisp(SafePointNode* call);
   // How many stack inputs does the current BC consume?
   // And, how does the stack change after the bytecode?
   // Returns false if unknown.
@@ -696,6 +697,7 @@ class GraphKit : public Phase {
   void  set_predefined_output_for_runtime_call(Node* call) {
     set_predefined_output_for_runtime_call(call, NULL, NULL);
   }
+  Node* set_predefined_input_for_runtime_call(SafePointNode* call, Node* ctrl = NULL);
   void  set_predefined_output_for_runtime_call(Node* call,
                                                Node* keep_mem,
                                                const TypePtr* hook_mem);
@@ -785,7 +787,9 @@ class GraphKit : public Phase {
                           Node* parm0 = NULL, Node* parm1 = NULL,
                           Node* parm2 = NULL, Node* parm3 = NULL,
                           Node* parm4 = NULL, Node* parm5 = NULL,
-                          Node* parm6 = NULL, Node* parm7 = NULL);
+                          Node* parm6 = NULL, Node* parm7 = NULL,
+                          Node* ctrl = NULL);
+  void make_wisp_yield(ciMethod* method);
   enum {  // flag values for make_runtime_call
     RC_NO_FP = 1,               // CallLeafNoFPNode
     RC_NO_IO = 2,               // do not hook IO edges

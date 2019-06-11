@@ -66,7 +66,21 @@
   product(uintx, MaxFreeCoroutinesCacheSize, 20,                            \
           "The max number of free coroutine stacks a thread can keep")      \
                                                                             \
-//add new AJDK specific flags here
+  product(bool, EnableCoroutineTimeSlice, false,                            \
+          "Wisp will perform yield periodically")                           \
+                                                                            \
+  product(bool, UseWispMonitor, false,                                      \
+          "yields to next coroutine when ObjectMonitor is contended")       \
+                                                                            \
+  product(bool, EnableSteal, true,                                          \
+          "Enable coroutine steal")                                         \
+                                                                            \
+  product(bool, UseWisp2, false,                                            \
+          "Enable Wisp2")                                                   \
+                                                                            \
+
+  //add new AJDK specific flags here
+
 
 AJDK_FLAGS(DECLARE_DEVELOPER_FLAG, DECLARE_PD_DEVELOPER_FLAG, DECLARE_PRODUCT_FLAG, DECLARE_PD_PRODUCT_FLAG, DECLARE_DIAGNOSTIC_FLAG, DECLARE_EXPERIMENTAL_FLAG, DECLARE_NOTPRODUCT_FLAG, DECLARE_MANAGEABLE_FLAG, DECLARE_PRODUCT_RW_FLAG, DECLARE_LP64_PRODUCT_FLAG)
 
