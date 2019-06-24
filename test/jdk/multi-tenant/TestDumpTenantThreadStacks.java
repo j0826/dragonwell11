@@ -8,7 +8,7 @@
 
 import com.alibaba.tenant.TenantConfiguration;
 import com.alibaba.tenant.TenantContainer;
-//import com.alibaba.wisp.engine.WispEngine;
+import com.alibaba.wisp.engine.WispEngine;
 import jdk.test.lib.process.OutputAnalyzer;
 import jdk.test.lib.process.ProcessTools;
 import java.lang.reflect.InvocationTargetException;
@@ -54,7 +54,6 @@ public class TestDumpTenantThreadStacks {
                         "at " + Observed.class.getName() + ".blocker"
                 },
                 // basic testing with coroutine
-                /*
                 new String[] {
                         "-XX:+MultiTenant",
                         "-XX:+EnableCoroutine",
@@ -73,7 +72,6 @@ public class TestDumpTenantThreadStacks {
                         "- Coroutine",
                         "waiting on condition"
                 },
-                */
                 // synchronous killing
                 new String[] {
                         "-XX:+MultiTenant",
@@ -113,7 +111,6 @@ public class TestDumpTenantThreadStacks {
                         "at " + TenantDieHard.class.getName() + ".bar",
                 },
                 // with coroutine enabled
-                /*
                 new String[] {
                         "-XX:+MultiTenant",
                         "-XX:+TenantThreadStop",
@@ -135,7 +132,6 @@ public class TestDumpTenantThreadStacks {
                         "- Coroutine",
                         "waiting on condition"
                 }
-                */
         };
 
         for (int i = 0; i < configs.length; i += 2) {
@@ -184,10 +180,9 @@ public class TestDumpTenantThreadStacks {
 
         private static void foo(Runnable r) {
             if (WISP_ENABLED) {
-                /*
                 for (int i = 0; i < 10; ++i) {
                     WispEngine.dispatch(Observed::blocker);
-                }*/
+                }
             } else {
                 r.run();
             }
@@ -245,7 +240,7 @@ public class TestDumpTenantThreadStacks {
                 blockThread(-1);
             };
             if (WISP_ENABLED) {
-                // WispEngine.dispatch(r);
+                WispEngine.dispatch(r);
             } else {
                 r.run();
             }

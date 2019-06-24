@@ -1987,38 +1987,6 @@ void GraphKit::set_predefined_output_for_runtime_call(Node* call,
   }
 }
 
-void GraphKit::set_predefined_output_for_runtime_call(Node* call,
-                                                      Node* keep_mem,
-                                                      const TypePtr* hook_mem, Node* ctrl) {
-  if (ctrl != NULL) {
-    set_control(ctrl);
-    assert(EnableCoroutine && EnableCoroutineTimeSlice, "Wisp time slice must be enabled.");
-  } else {
-    // no i/o
-    set_control(_gvn.transform( new ProjNode(call,TypeFunc::Control) ));
-  }
-  if (keep_mem) {
-    // First clone the existing memory state
-    set_all_memory(keep_mem);
-    if (hook_mem != NULL) {
-      // Make memory for the call
-      Node* mem = _gvn.transform( new ProjNode(call, TypeFunc::Memory) );
-      // Set the RawPtr memory state only.  This covers all the heap top/GC stuff
-      // We also use hook_mem to extract specific effects from arraycopy stubs.
-      set_memory(mem, hook_mem);
-    }
-    // ...else the call has NO memory effects.
-
-    // Make sure the call advertises its memory effects precisely.
-    // This lets us build accurate anti-dependences in gcm.cpp.
-    assert(C->alias_type(call->adr_type()) == C->alias_type(hook_mem),
-           "call node must be constructed correctly");
-  } else {
-    assert(hook_mem == NULL, "");
-    // This is not a "slow path" call; all memory comes from the call.
-    set_all_memory_call(call);
-  }
-}
 // Replace the call with the current state of the kit.
 void GraphKit::replace_call(CallNode* call, Node* result, bool do_replaced_nodes) {
   JVMState* ejvms = NULL;
@@ -2599,8 +2567,7 @@ Node* GraphKit::make_runtime_call(int flags,
                                   Node* parm0, Node* parm1,
                                   Node* parm2, Node* parm3,
                                   Node* parm4, Node* parm5,
-                                  Node* parm6, Node* parm7,
-                                  Node* ctrl) {
+                                  Node* parm6, Node* parm7) {
   assert(call_addr != NULL, "must not call NULL targets");
 
   // Slow-path call
@@ -2629,7 +2596,7 @@ Node* GraphKit::make_runtime_call(int flags,
 
   Node* prev_mem = NULL;
   if (wide_in) {
-    prev_mem = set_predefined_input_for_runtime_call(call, ctrl);
+    prev_mem = set_predefined_input_for_runtime_call(call);
   } else {
     assert(!wide_out, "narrow in => narrow out");
     Node* narrow_mem = memory(adr_type);
@@ -2669,10 +2636,10 @@ Node* GraphKit::make_runtime_call(int flags,
 
   if (wide_out) {
     // Slow path call has full side-effects.
-    set_predefined_output_for_runtime_call(call, ctrl);
+    set_predefined_output_for_runtime_call(call);
   } else {
     // Slow path call has few side-effects, and/or sets few values.
-    set_predefined_output_for_runtime_call(call, prev_mem, adr_type, ctrl);
+    set_predefined_output_for_runtime_call(call, prev_mem, adr_type);
   }
 
   if (has_io) {
@@ -3381,44 +3348,6 @@ Node* GraphKit::insert_mem_bar_volatile(int opcode, int alias_idx, Node* precede
 }
 
 #define __ ideal.
-
-void GraphKit::make_wisp_yield(ciMethod* method) {
-  assert(EnableCoroutine, "Coroutine is disabled");
-  IdealKit ideal(this, true);
-  Node* no_base = __ top();
-  Node* tls = __ thread();
-  const int mark_offset = in_bytes(JavaThread::wisp_preempt_offset());
-  Node* mark_preempt_addr = __ AddP(no_base, tls, __ ConX(mark_offset));
-  Node* mark_preempt_val = __ load(__ ctrl(), mark_preempt_addr, TypeInt::BYTE, T_BYTE, Compile::AliasIdxRaw);
-  Node*   zero = __ ConI(0);
-  const TypeFunc *call_type    = OptoRuntime::yield_method_exit_Type();
-  address         call_address = CAST_FROM_FN_PTR(address, SharedRuntime::wisp_yield);
-  const char     *call_name    = "wisp_yield";
-  // Get base of thread-local storage area
-  Node* thread = _gvn.transform( new ThreadLocalNode() );
-
-  // Get method
-  const TypePtr* method_type = TypeMetadataPtr::make(method);
-  Node *method_node = _gvn.transform( ConNode::make(method_type) );
-
-  kill_dead_locals();
-
-  // For some reason, this call reads only raw memory.
-  const TypePtr* raw_adr_type = TypeRawPtr::BOTTOM;
-  __ if_then(mark_preempt_val, BoolTest::ne, zero) ; {
-    // Totally 8 parameters, 2 used, 6 NULL
-    Node* call = make_runtime_call(RC_NARROW_MEM,
-                    call_type, call_address,
-                    call_name, raw_adr_type,
-                    thread, method_node, 
-                    NULL, NULL, NULL,
-                    NULL, NULL, NULL,
-                    __ ctrl());
-    __ set_ctrl( _gvn.transform( new ProjNode(call, TypeFunc::Control)));
-  } __ end_if();
-  final_sync(ideal);
-}
-
 
 //------------------------------shared_lock------------------------------------
 // Emit locking code.

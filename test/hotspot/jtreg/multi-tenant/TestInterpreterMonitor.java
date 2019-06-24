@@ -10,6 +10,7 @@ import static jdk.test.lib.Asserts.*;
  * @build sun.hotspot.WhiteBox
  * @run driver ClassFileInstaller sun.hotspot.WhiteBox
  * @run main/othervm -Xbootclasspath/a:. -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Xint TestInterpreterMonitor
+ * @run main/othervm -Xbootclasspath/a:. -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Xint -XX:+EnableCoroutine -XX:+UseWispMonitor TestInterpreterMonitor
  * @run main/othervm -Xbootclasspath/a:. -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Xint -XX:+MultiTenant -XX:+TenantThreadStop TestInterpreterMonitor
  */
 

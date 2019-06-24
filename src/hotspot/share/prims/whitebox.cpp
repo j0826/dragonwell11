@@ -2012,13 +2012,11 @@ WB_ENTRY(void, WB_CallInterpreterRuntimeEntry(JNIEnv* env, jobject wb, jstring n
     // simulate the behavior of a Java caller
     ThreadStateTransition::transition_and_fence(thread, _thread_in_vm, _thread_in_Java);
     // vm_results `will be cleared by new_illegal_monitor_state_exception
-    /*
     if (EnableCoroutine && UseWispMonitor) {
       thread->set_vm_result_for_wisp(vm_res_obj);
     } else {
-    */
       thread->set_vm_result(vm_res_obj);
-    // }
+    }
     InterpreterRuntime::new_illegal_monitor_state_exception(thread);
     ThreadStateTransition::transition_and_fence(thread, _thread_in_Java, _thread_in_vm);
   } else {

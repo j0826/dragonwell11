@@ -2043,9 +2043,9 @@ class Thread implements Runnable {
     }
 
     /**
-     * @return if this thread is executing JNI code
+     * @return if this thread is still executing the same JNI code
      */
-    native boolean isInNative();
+    native boolean isInSameNative();
 
     // Added in JSR-166
 

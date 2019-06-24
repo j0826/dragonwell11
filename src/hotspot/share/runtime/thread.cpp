@@ -1575,7 +1575,7 @@ void JavaThread::initialize() {
   _coroutine_stack_list = NULL;
   _coroutine_list = NULL;
   _current_coroutine = NULL;
-  _wisp_preempt = false;
+  _wisp_preempted = false;
 
   _thread_stat = NULL;
   _thread_stat = new ThreadStatistics();
@@ -2016,12 +2016,16 @@ void JavaThread::exit(bool destroy_vm, ExitType exit_type) {
       !is_jvmti_agent_thread()) {
     assert(!UseWispMonitor || destroy_vm ||
         java_lang_Thread::park_event(_threadObj), "park_event should been set");
+    TenantShutdownMark tsm(this);
+    // wisp cleanup fail is fatal error, should not interrupted by tenant death
+    assert(!TenantThreadStop || is_tenant_shutdown_masked(), "should be masked!");
     EXCEPTION_MARK;
     JavaValue result(T_VOID);
     JavaCalls::call_virtual(&result,
                             threadObj, SystemDictionary::Thread_klass(),
                             vmSymbols::destroyCoroutineSupport_method_name(),
                             vmSymbols::void_method_signature(), THREAD);
+    assert(!TenantThreadStop || is_tenant_shutdown_masked(), "should be masked!");
     assert(_current_coroutine == _coroutine_list, "not thread coroutine");
     assert(_coroutine_list->next() == _coroutine_list, "ensure all coroutine has benn killed");
     CLEAR_PENDING_EXCEPTION;
@@ -2193,11 +2197,9 @@ void JavaThread::disable_tenant_shutdown() {
          && _tenant_shutdown_mark_level > TSM_uninitialized, "pre-condition");
   assert(this == Thread::current(), "Only allow to be called by current thread");
 
-  /*
   if (EnableCoroutine && !current_coroutine()->is_thread_coroutine()) {
     return;
   }
-  */
 
   int old_level, new_level, level;
   old_level = new_level = level = TSM_uninitialized;
@@ -2227,11 +2229,9 @@ void JavaThread::enable_tenant_shutdown() {
          && _tenant_shutdown_mark_level > TSM_idle, "pre-condition");
   assert(this == Thread::current(), "Only allow to be called by current thread");
 
-  /*
   if (EnableCoroutine && !current_coroutine()->is_thread_coroutine()) {
     return;
   }
-  */
 
   if (_tenant_shutdown_mark_level > TSM_idle) {
     Atomic::dec(&_tenant_shutdown_mark_level);
@@ -3184,6 +3184,14 @@ void JavaThread::compiledMethods_do(CodeBlobClosure* cf) {
     for (StackFrameStream fst(this); !fst.is_done(); fst.next()) {
       fst.current()->compiledMethods_do(cf);
     }
+  }
+
+  if (EnableCoroutine) {
+    Coroutine* current = _coroutine_list;
+    do {
+      current->compiledMethods_do(cf);
+      current = current->next();
+    } while (current != _coroutine_list);
   }
 }
 
