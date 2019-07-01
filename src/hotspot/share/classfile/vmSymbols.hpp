@@ -1568,6 +1568,105 @@
   do_intrinsic(_getAndSetObject,          jdk_internal_misc_Unsafe,     getAndSetObject_name, getAndSetObject_signature,  F_R)\
    do_name(     getAndSetObject_name,                                   "getAndSetObject")                                    \
    do_signature(getAndSetObject_signature,                              "(Ljava/lang/Object;JLjava/lang/Object;)Ljava/lang/Object;" ) \
+                                                                                                                                               \
+  /* Vector API intrinsification support */                                                                                                    \
+  do_intrinsic(_VectorUnaryOp, jdk_panama_vector_VectorIntrinsics, vector_unary_op_name, vector_unary_op_sig, F_S)                          \
+   do_signature(vector_unary_op_sig, "(ILjava/lang/Class;Ljava/lang/Class;ILjava/lang/Object;Ljava/util/function/Function;)Ljava/lang/Object;") \
+   do_name(vector_unary_op_name,     "unaryOp")                                                                                                \
+                                                                                                                                               \
+  do_intrinsic(_VectorBinaryOp, jdk_panama_vector_VectorIntrinsics, vector_binary_op_name, vector_binary_op_sig, F_S)                       \
+   do_signature(vector_binary_op_sig, "(ILjava/lang/Class;Ljava/lang/Class;ILjava/lang/Object;Ljava/lang/Object;Ljava/util/function/BiFunction;)Ljava/lang/Object;") \
+   do_name(vector_binary_op_name,     "binaryOp")                                                                                              \
+                                                                                                                                               \
+  do_intrinsic(_VectorTernaryOp, jdk_panama_vector_VectorIntrinsics, vector_ternary_op_name, vector_ternary_op_sig, F_S)                    \
+   do_signature(vector_ternary_op_sig, "(ILjava/lang/Class;Ljava/lang/Class;ILjava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;Ljdk/panama/vector/VectorIntrinsics$TernaryOperation;)Ljava/lang/Object;") \
+   do_name(vector_ternary_op_name,     "ternaryOp")                                                                                            \
+                                                                                                                                               \
+  do_intrinsic(_VectorBroadcastCoerced, jdk_panama_vector_VectorIntrinsics, vector_broadcast_coerced_name, vector_broadcast_coerced_sig, F_S) \
+   do_signature(vector_broadcast_coerced_sig, "(Ljava/lang/Class;Ljava/lang/Class;IJLjava/util/function/LongFunction;)Ljava/lang/Object;")     \
+   do_name(vector_broadcast_coerced_name, "broadcastCoerced")                                                                                  \
+                                                                                                                                               \
+  do_intrinsic(_VectorLoadOp, jdk_panama_vector_VectorIntrinsics, vector_load_op_name, vector_load_op_sig, F_S)                             \
+   do_signature(vector_load_op_sig, "(Ljava/lang/Class;Ljava/lang/Class;ILjava/lang/Object;JLjava/lang/Object;ILjdk/panama/vector/VectorIntrinsics$LoadOperation;)Ljava/lang/Object;") \
+   do_name(vector_load_op_name,     "load")                                                                                                    \
+  do_intrinsic(_VectorStoreOp, jdk_panama_vector_VectorIntrinsics, vector_store_op_name, vector_store_op_sig, F_S)                          \
+   do_signature(vector_store_op_sig, "(Ljava/lang/Class;Ljava/lang/Class;ILjava/lang/Object;JLjdk/panama/vector/Vector;Ljava/lang/Object;ILjdk/panama/vector/VectorIntrinsics$StoreVectorOperation;)V") \
+   do_name(vector_store_op_name,     "store")                                                                                                  \
+                                                                                                                                               \
+  do_intrinsic(_VectorReductionCoerced, jdk_panama_vector_VectorIntrinsics, vector_reduction_coerced_name, vector_reduction_coerced_sig, F_S) \
+   do_signature(vector_reduction_coerced_sig, "(ILjava/lang/Class;Ljava/lang/Class;ILjdk/panama/vector/Vector;Ljava/util/function/Function;)J") \
+   do_name(vector_reduction_coerced_name, "reductionCoerced")                                                                                  \
+                                                                                                                                               \
+  do_intrinsic(_VectorTest, jdk_panama_vector_VectorIntrinsics, vector_test_name, vector_test_sig, F_S)                                     \
+   do_signature(vector_test_sig, "(ILjava/lang/Class;Ljava/lang/Class;ILjava/lang/Object;Ljava/lang/Object;Ljava/util/function/BiFunction;)Z") \
+   do_name(vector_test_name, "test")                                                                                                           \
+                                                                                                                                               \
+  do_intrinsic(_VectorBlend, jdk_panama_vector_VectorIntrinsics, vector_blend_name, vector_blend_sig, F_S)                                  \
+   do_signature(vector_blend_sig, "(Ljava/lang/Class;Ljava/lang/Class;Ljava/lang/Class;I"                                                      \
+                                   "Ljdk/panama/vector/Vector;Ljdk/panama/vector/Vector;Ljdk/panama/vector/Vector$Mask;"              \
+                                   "Ljdk/panama/vector/VectorIntrinsics$VectorBlendOp;)Ljdk/panama/vector/Vector;")                      \
+   do_name(vector_blend_name, "blend")                                                                                                         \
+                                                                                                                                               \
+  do_intrinsic(_VectorCompare, jdk_panama_vector_VectorIntrinsics, vector_compare_name, vector_compare_sig, F_S)                            \
+   do_signature(vector_compare_sig, "(ILjava/lang/Class;Ljava/lang/Class;Ljava/lang/Class;I"                                                   \
+                                    "Ljdk/panama/vector/Vector;Ljdk/panama/vector/Vector;"                                               \
+                                    "Ljdk/panama/vector/VectorIntrinsics$VectorCompareOp;)Ljdk/panama/vector/Vector$Mask;")              \
+   do_name(vector_compare_name, "compare")                                                                                                     \
+                                                                                                                                               \
+  do_intrinsic(_VectorRearrange, jdk_panama_vector_VectorIntrinsics, vector_rearrange_name, vector_rearrange_sig, F_S)                      \
+   do_signature(vector_rearrange_sig, "(Ljava/lang/Class;Ljava/lang/Class;Ljava/lang/Class;I"                                                  \
+                                      "Ljdk/panama/vector/Vector;Ljdk/panama/vector/Vector$Shuffle;"                                     \
+                                      "Ljdk/panama/vector/VectorIntrinsics$VectorRearrangeOp;)Ljdk/panama/vector/Vector;")               \
+   do_name(vector_rearrange_name, "rearrangeOp")                                                                                               \
+                                                                                                                                               \
+  do_intrinsic(_VectorExtract, jdk_panama_vector_VectorIntrinsics, vector_extract_name, vector_extract_sig, F_S)                            \
+   do_signature(vector_extract_sig, "(Ljava/lang/Class;Ljava/lang/Class;I"                                                                     \
+                                    "Ljdk/panama/vector/Vector;I"                                                                           \
+                                    "Ljdk/panama/vector/VectorIntrinsics$VecExtractOp;)J")                                                  \
+   do_name(vector_extract_name, "extract")                                                                                                     \
+                                                                                                                                               \
+ do_intrinsic(_VectorInsert, jdk_panama_vector_VectorIntrinsics, vector_insert_name, vector_insert_sig, F_S)                                \
+   do_signature(vector_insert_sig, "(Ljava/lang/Class;Ljava/lang/Class;I"                                                                      \
+                                     "Ljdk/panama/vector/Vector;IJ"                                                                         \
+                                     "Ljdk/panama/vector/VectorIntrinsics$VecInsertOp;)Ljdk/panama/vector/Vector;")                      \
+   do_name(vector_insert_name, "insert")                                                                                                       \
+                                                                                                                                               \
+  do_intrinsic(_VectorBroadcastInt, jdk_panama_vector_VectorIntrinsics, vector_broadcast_int_name, vector_broadcast_int_sig, F_S)           \
+   do_signature(vector_broadcast_int_sig, "(ILjava/lang/Class;Ljava/lang/Class;I"                                                              \
+                                          "Ljdk/panama/vector/Vector;I"                                                                     \
+                                          "Ljdk/panama/vector/VectorIntrinsics$VectorBroadcastIntOp;)Ljdk/panama/vector/Vector;")        \
+   do_name(vector_broadcast_int_name, "broadcastInt")                                                                                          \
+                                                                                                                                               \
+  do_intrinsic(_VectorReinterpret, jdk_panama_vector_VectorIntrinsics, vector_reinterpret_name, vector_reinterpret_sig, F_S)                \
+   do_signature(vector_reinterpret_sig, "(Ljava/lang/Class;Ljava/lang/Class;I"                                                                 \
+                                      "Ljava/lang/Class;Ljava/lang/Class;ILjava/lang/Object;Ljava/lang/Object;"                                \
+                                      "Ljdk/panama/vector/VectorIntrinsics$VectorReinterpretOp;)Ljava/lang/Object;")                        \
+   do_name(vector_reinterpret_name, "reinterpret")                                                                                             \
+                                                                                                                                               \
+   do_intrinsic(_VectorCast, jdk_panama_vector_VectorIntrinsics, Class_cast_name, vector_cast_sig, F_S)                                     \
+    do_signature(vector_cast_sig, "(Ljava/lang/Class;Ljava/lang/Class;I"                                                                       \
+                                  "Ljava/lang/Class;Ljava/lang/Class;ILjava/lang/Object;Ljava/lang/Object;"                                    \
+                                  "Ljdk/panama/vector/VectorIntrinsics$VectorCastOp;)Ljava/lang/Object;")                                   \
+                                                                                                                                               \
+   do_intrinsic(_VectorGatherOp, jdk_panama_vector_VectorIntrinsics, vector_gather_name, vector_gather_sig, F_S)                            \
+    do_signature(vector_gather_sig, "(Ljava/lang/Class;Ljava/lang/Class;ILjava/lang/Class;"                                                    \
+                                   "Ljava/lang/Object;J"                                                                                       \
+                                   "Ljdk/panama/vector/IntVector;"                                                                             \
+                                   "Ljava/lang/Object;I[II"                                                                                    \
+                                   "Ljdk/panama/vector/VectorIntrinsics$LoadVectorOperationWithMap;)"                                       \
+                                   "Ljdk/panama/vector/Vector;")                                                                            \
+    do_name(vector_gather_name, "loadWithMap")                                                                                                 \
+   do_intrinsic(_VectorScatterOp, jdk_panama_vector_VectorIntrinsics, vector_scatter_name, vector_scatter_sig, F_S)                         \
+    do_signature(vector_scatter_sig, "(Ljava/lang/Class;Ljava/lang/Class;ILjava/lang/Class;"                                                   \
+                                   "Ljava/lang/Object;J"                                                                                       \
+                                   "Ljdk/panama/vector/IntVector;Ljdk/panama/vector/Vector;"                                                \
+                                   "Ljava/lang/Object;I[II"                                                                                    \
+                                   "Ljdk/panama/vector/VectorIntrinsics$StoreVectorOperationWithMap;)V")                                    \
+    do_name(vector_scatter_name, "storeWithMap")                                                                                               \
+  do_intrinsic(_VectorRebox, jdk_panama_vector_VectorIntrinsics, vector_rebox_name, vector_rebox_sig, F_S)                                  \
+   do_alias(vector_rebox_sig, object_object_signature)                                                                                         \
+   do_name(vector_rebox_name, "maybeRebox")                                                                                                    \
+                                                                                                                                               \
                                                                                                                                \
    /* (2) Bytecode intrinsics                                                                        */                        \
                                                                                                                                \
@@ -1697,7 +1796,7 @@ class vmSymbols: AllStatic {
     FIRST_SID = NO_SID + 1
   };
   enum {
-    log2_SID_LIMIT = 10         // checked by an assert at start-up
+    log2_SID_LIMIT = 12         // checked by an assert at start-up
   };
 
  private:
@@ -1763,7 +1862,9 @@ class vmIntrinsics: AllStatic {
     #undef VM_INTRINSIC_ENUM
 
     ID_LIMIT,
-    LAST_COMPILER_INLINE = _getAndSetObject,
+    LAST_COMPILER_INLINE = _VectorScatterOp,
+    FIRST_VECTOR_API     = _VectorUnaryOp,
+    LAST_VECTOR_API      = _VectorRebox,
     FIRST_MH_SIG_POLY    = _invokeGeneric,
     FIRST_MH_STATIC      = _linkToVirtual,
     LAST_MH_SIG_POLY     = _linkToInterface,

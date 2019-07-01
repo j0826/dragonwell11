@@ -46,6 +46,7 @@
 #include "opto/runtime.hpp"
 #include "opto/subnode.hpp"
 #include "opto/type.hpp"
+#include "opto/vectornode.hpp"
 #include "runtime/sharedRuntime.hpp"
 #if INCLUDE_G1GC
 #include "gc/g1/g1ThreadLocalData.hpp"
@@ -1093,12 +1094,16 @@ bool PhaseMacroExpand::eliminate_allocate_node(AllocateNode *alloc) {
 
 #ifndef PRODUCT
   if (PrintEliminateAllocations) {
-    if (alloc->is_AllocateArray())
-      tty->print_cr("++++ Eliminated: %d AllocateArray", alloc->_idx);
-    else
-      tty->print_cr("++++ Eliminated: %d Allocate", alloc->_idx);
+    if (alloc->is_AllocateArray()) {
+      tty->print("++++ Eliminated: %d AllocateArray ", alloc->_idx);
+    } else {
+      tty->print("++++ Eliminated: %d Allocate ", alloc->_idx);
+    }
+    tklass->klass()->print_name_on(tty);
+    tty->cr();
+    alloc->jvms()->print_on(tty);
   }
-#endif
+#endif // PRODUCT
 
   return true;
 }
@@ -1137,6 +1142,9 @@ bool PhaseMacroExpand::eliminate_boxing_node(CallStaticJavaNode *boxing) {
     tty->print("++++ Eliminated: %d ", boxing->_idx);
     boxing->method()->print_short_name(tty);
     tty->cr();
+    if (UseVectorAPI) {
+      boxing->jvms()->print_on(tty);
+    }
   }
 #endif
 
@@ -2155,6 +2163,7 @@ bool PhaseMacroExpand::eliminate_locking_node(AbstractLockNode *alock) {
     } else {
       tty->print_cr("++++ Eliminated: %d Unlock", alock->_idx);
     }
+    alock->jvms()->print_on(tty);
   }
 #endif
 
@@ -2583,8 +2592,9 @@ void PhaseMacroExpand::eliminate_macro_nodes() {
                n->Opcode() == Op_Opaque1   ||
                n->Opcode() == Op_Opaque2   ||
                n->Opcode() == Op_Opaque3   ||
-               BarrierSet::barrier_set()->barrier_set_c2()->is_gc_barrier_node(n),
-               "unknown node type in macro list");
+               BarrierSet::barrier_set()->barrier_set_c2()->is_gc_barrier_node(n) ||
+               n->Opcode() == Op_Opaque4   ||
+               n->Opcode() == Op_VectorUnbox, "unknown node type in macro list");
       }
       assert(success == (C->macro_count() < old_macro_count), "elimination reduces macro count");
       progress = progress || success;
