@@ -36,6 +36,9 @@
   product(bool, UseAppAOT, false,                                           \
           "Use AOT for app class loader")                                   \
                                                                             \
+  product(bool, PromoteAOTtoFullProfile, true,                              \
+          "promote to full profile level for aot tiered-compiled method")   \
+                                                                            \
   product(bool, MultiTenant, false,                                         \
           "Enable the multi-tenant feature.")                               \
                                                                             \

@@ -731,6 +731,8 @@ CompLevel TieredThresholdPolicy::common(Predicate p, Method* method, CompLevel c
                                Tier3DelayOff * compiler_count(CompLevel_full_optimization) &&
                                (this->*p)(i, b, cur_level, method))) {
         next_level = CompLevel_full_profile;
+      } else if (PromoteAOTtoFullProfile) {
+        next_level = CompLevel_full_profile;
       }
     }
     break;
@@ -862,6 +864,10 @@ CompLevel TieredThresholdPolicy::loop_event(Method* method, CompLevel cur_level,
 }
 
 bool TieredThresholdPolicy::maybe_switch_to_aot(const methodHandle& mh, CompLevel cur_level, CompLevel next_level, JavaThread* thread) {
+  if (UseAppAOT) {
+    // app aot will invalid aot method, do not reuse it
+    return false;
+  }
   if (UseAOT && !delay_compilation_during_startup()) {
     if (cur_level == CompLevel_full_profile || cur_level == CompLevel_none) {
       // If the current level is full profile or interpreter and we're switching to any other level,

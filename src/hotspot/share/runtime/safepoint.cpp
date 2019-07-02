@@ -153,10 +153,9 @@ static bool timeout_error_printed = false;
 volatile bool SafepointSynchronize::_should_clear_nmethods = false;
 volatile bool SafepointSynchronize::_is_at_full_gc_pause = false;
 
-static void clear_seen_on_stack(CodeBlob* cb) {
+static void clear_seen_on_stack(nmethod* nm) {
   assert(TenantThreadStop && SafepointSynchronize::is_at_safepoint(), "pre-condition");
-  if (cb != NULL && cb->is_nmethod()) {
-    nmethod* nm = (nmethod*)cb;
+  if (nm != NULL) {
     nm->set_seen_on_stack(false);
   }
 }
@@ -501,7 +500,7 @@ void SafepointSynchronize::begin() {
   }
 
   if (TenantThreadStop) {
-    CodeCache::blobs_do(clear_seen_on_stack);
+    CodeCache::nmethods_do(clear_seen_on_stack);
   }
 
   if (PrintSafepointStatistics) {
