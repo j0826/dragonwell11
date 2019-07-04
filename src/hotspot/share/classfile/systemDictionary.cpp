@@ -1388,7 +1388,7 @@ InstanceKlass* SystemDictionary::load_shared_class(InstanceKlass* ik,
     ClassLoadingService::notify_class_loaded(ik, true /* shared class */);
 
     ik->set_has_passed_fingerprint_check(false);
-    if (UseAOT && ik->supers_have_passed_fingerprint_checks()) {
+    if (!UseAppAOT && UseAOT && ik->supers_have_passed_fingerprint_checks()) {
       uint64_t aot_fp = AOTLoader::get_saved_fingerprint(ik);
       uint64_t cds_fp = ik->get_stored_fingerprint();
       if (aot_fp != 0 && aot_fp == cds_fp) {

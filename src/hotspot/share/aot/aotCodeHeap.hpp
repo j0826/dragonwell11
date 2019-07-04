@@ -237,6 +237,8 @@ class AOTCodeHeap : public CodeHeap {
   void link_primitive_array_klasses();
   void publish_aot(const methodHandle& mh, AOTMethodData* method_data, int code_id);
 
+  bool has_passed_fingerprint_check(InstanceKlass* ik);
+  bool supers_have_passed_fingerprint_checks(InstanceKlass* ik);
 
   AOTCompiledMethod* next_in_use_at(int index) const;
 

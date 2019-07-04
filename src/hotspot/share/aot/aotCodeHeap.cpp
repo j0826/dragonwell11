@@ -45,6 +45,48 @@ bool AOTLib::_narrow_oop_shift_initialized = false;
 int  AOTLib::_narrow_oop_shift = 0;
 int  AOTLib::_narrow_klass_shift = 0;
 
+bool AOTCodeHeap::has_passed_fingerprint_check(InstanceKlass* ik) {
+  if (UseAppAOT) {
+    AOTKlassData* klass_data = find_klass(ik);
+    if (klass_data == NULL) {
+      return false;
+    }
+    assert(ik->get_stored_fingerprint() != 0, "Fingerprint must be saved in AppAOT!");
+    if (klass_data->_fingerprint != ik->get_stored_fingerprint()) {
+      return false;
+    }
+
+    return supers_have_passed_fingerprint_checks(ik);
+  }
+
+  return ik->has_passed_fingerprint_check();
+}
+
+bool AOTCodeHeap::supers_have_passed_fingerprint_checks(InstanceKlass* ik) {
+  if (UseAppAOT) {
+    InstanceKlass* super_klass = ik->java_super();
+    if (super_klass != NULL) {
+      if (!has_passed_fingerprint_check(super_klass)) {
+        return false;
+      }
+    }
+
+    Array<Klass*>* local_interfaces = ik->local_interfaces();
+    if (local_interfaces != NULL) {
+      int length = local_interfaces->length();
+      for (int i = 0; i < length; i++) {
+        InstanceKlass* intf = InstanceKlass::cast(local_interfaces->at(i));
+        if (!has_passed_fingerprint_check(intf)) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  return ik->supers_have_passed_fingerprint_checks();
+}
+
 address AOTLib::load_symbol(const char *name) {
   address symbol = (address) os::dll_lookup(_dl_handle, name);
   if (symbol == NULL) {
@@ -662,7 +704,7 @@ bool AOTCodeHeap::is_dependent_method(Klass* dependee, AOTCompiledMethod* aot) {
   if (klass_data == NULL) {
     return false; // no AOT records for this class - no dependencies
   }
-  if (!dependee_ik->has_passed_fingerprint_check()) {
+  if (!has_passed_fingerprint_check(dependee_ik)) {
     return false; // different class
   }
 
@@ -772,7 +814,7 @@ bool AOTCodeHeap::load_klass_data(InstanceKlass* ik, Thread* thread) {
     return false;
   }
 
-  if (!ik->has_passed_fingerprint_check()) {
+  if (!has_passed_fingerprint_check(ik)) {
     NOT_PRODUCT( aot_klasses_fp_miss++; )
     log_trace(aot, class, fingerprint)("class  %s%s  has bad fingerprint in  %s tid=" INTPTR_FORMAT,
                                        ik->internal_name(), ik->is_shared() ? " (shared)" : "",
@@ -1093,7 +1135,7 @@ bool AOTCodeHeap::reconcile_dynamic_klass(AOTCompiledMethod *caller, InstanceKla
   }
 
   // TODO: support anonymous supers
-  if (!dyno->supers_have_passed_fingerprint_checks() || dyno->get_stored_fingerprint() != dyno_data->_fingerprint) {
+  if (!supers_have_passed_fingerprint_checks(dyno) || dyno->get_stored_fingerprint() != dyno_data->_fingerprint) {
       NOT_PRODUCT( aot_klasses_fp_miss++; )
       log_trace(aot, class, fingerprint)("class  %s%s  has bad fingerprint in  %s tid=" INTPTR_FORMAT,
           dyno->internal_name(), dyno->is_shared() ? " (shared)" : "",

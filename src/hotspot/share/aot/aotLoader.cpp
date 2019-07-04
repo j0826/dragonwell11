@@ -58,22 +58,11 @@ uint64_t AOTLoader::get_saved_fingerprint(InstanceKlass* ik) {
     // don't even bother
     return 0;
   }
-  if (UseAppAOT) {
-    // search code heap from classLoaderData
-    ClassLoaderData* cld = ik->class_loader_data();
-    assert(cld != NULL, "invariant");
-    if (cld != NULL && cld->aot_code_heap() != NULL) {
-      assert(cld->app_aot_enabled(), "invariant");
-      AOTCodeHeap* heap = cld->aot_code_heap();
-      AOTKlassData* klass_data = heap->find_klass(ik);
-      if (klass_data != NULL) {
-        log_debug(aot,fingerprint)("fingerprint of %s is " UINT64_FORMAT, ik->external_name(), klass_data->_fingerprint);
-        return klass_data->_fingerprint;
-      } else {
-        return 0;
-      }
-    }
-  }
+
+  // AppAOT always stores the fingerprint.
+  // We have no need to find a fingerprint by iterating the heaps.
+  assert(!UseAppAOT, "Should not reach here.");
+
   FOR_ALL_AOT_HEAPS(heap) {
     AOTKlassData* klass_data = (*heap)->find_klass(ik);
     if (klass_data != NULL) {
