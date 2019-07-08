@@ -65,6 +65,7 @@ public class VersionCheck extends TestHelper {
         "packager",
         "ssvagent",
         "unpack200",
+        "jgroup"
     };
 
     // tools that do not accept -version
@@ -114,7 +115,8 @@ public class VersionCheck extends TestHelper {
         "serialver",
         "servertool",
         "ssvagent",
-        "unpack200"
+        "unpack200",
+        "jgroup"
     };
 
     // expected reference strings
