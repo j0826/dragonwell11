@@ -2403,8 +2403,9 @@ void JavaThread::check_and_handle_async_exceptions(bool check_unsafe_error) {
   // Check for pending async. exception
   if (_pending_async_exception != NULL) {
     // Only overwrite an already pending exception, if it is not a threadDeath.
-    if (!has_pending_exception() || !pending_exception()->is_a(SystemDictionary::ThreadDeath_klass())
-        || !pending_exception()->is_a(SystemDictionary::com_alibaba_tenant_TenantDeathException_klass())) {
+    if (!has_pending_exception()
+        || !pending_exception()->is_a(SystemDictionary::ThreadDeath_klass())
+        ||  (MultiTenant && TenantThreadStop && !pending_exception()->is_a(SystemDictionary::com_alibaba_tenant_TenantDeathException_klass()))) {
 
       // We cannot call Exceptions::_throw(...) here because we cannot block
       set_pending_exception(_pending_async_exception, __FILE__, __LINE__);
