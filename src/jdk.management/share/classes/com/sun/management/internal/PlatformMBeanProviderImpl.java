@@ -25,7 +25,9 @@
 package com.sun.management.internal;
 
 import com.alibaba.management.TenantContainerMXBean;
+import com.alibaba.management.WispCounterMXBean;
 import com.alibaba.management.internal.TenantContainerMXBeanImpl;
+import com.alibaba.management.internal.WispCounterMXBeanImpl;
 import com.sun.management.DiagnosticCommandMBean;
 import com.sun.management.HotSpotDiagnosticMXBean;
 import com.sun.management.ThreadMXBean;
@@ -54,6 +56,7 @@ public final class PlatformMBeanProviderImpl extends PlatformMBeanProvider {
     private static HotSpotDiagnostic hsDiagMBean = null;
     private static OperatingSystemMXBean osMBean = null;
     private static TenantContainerMXBean tenantMBean = null;
+    private static WispCounterMXBean wispCounterMBean = null;
 
     static {
        AccessController.doPrivileged((PrivilegedAction<Void>) () -> {
@@ -299,6 +302,38 @@ public final class PlatformMBeanProviderImpl extends PlatformMBeanProvider {
             }
         });
 
+        /**
+         * Wisp-Counter support.
+         */
+        initMBeanList.add(new PlatformComponent<com.alibaba.management.WispCounterMXBean>() {
+            private final Set<String> wispCounterMXBeanInterfaceNames =
+                    Collections.unmodifiableSet(Collections.<String>singleton(
+                            "com.alibaba.management.WispCounterMXBean"));
+
+            @Override
+            public Set<Class<? extends com.alibaba.management.WispCounterMXBean>> mbeanInterfaces() {
+                return Collections.singleton(com.alibaba.management.WispCounterMXBean.class);
+            }
+
+            @Override
+            public Set<String> mbeanInterfaceNames() {
+                return wispCounterMXBeanInterfaceNames;
+            }
+
+            @Override
+            public String getObjectNamePattern() {
+                return "com.alibaba.management:type=WispCounter";
+            }
+
+            @Override
+            public Map<String, com.alibaba.management.WispCounterMXBean> nameToMBeanMap() {
+                return Collections.<String, com.alibaba.management.WispCounterMXBean>singletonMap(
+                        "com.alibaba.management:type=WispCounter",
+                        getWispCounterMXBean());
+            }
+        });
+
+
         initMBeanList.trimToSize();
         return initMBeanList;
     }
@@ -322,5 +357,12 @@ public final class PlatformMBeanProviderImpl extends PlatformMBeanProvider {
             tenantMBean = new TenantContainerMXBeanImpl();
         }
         return tenantMBean;
+    }
+
+    private static synchronized WispCounterMXBean getWispCounterMXBean() {
+        if (wispCounterMBean == null) {
+            wispCounterMBean = new WispCounterMXBeanImpl();
+        }
+        return wispCounterMBean;
     }
 }
