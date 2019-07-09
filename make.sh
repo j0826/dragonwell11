@@ -11,7 +11,8 @@ fi
 
 DOCKER_IMAGE=reg.docker.alibaba-inc.com/ajdk/11.alios7
 SCRIPT_NAME=`basename $0`
-VERSION_UPDATE=3
+VERSION_INTERIM=1
+VERSION_UPDATE=4
 MX=`pwd`/mx/mx
 BUILD_UID=`id -u ${USER}`
 
@@ -37,7 +38,7 @@ if [ $PREBUILD -eq 1 ]; then
     else
         BUILD_USER='admin' # 'admin' user exists in docker image
     fi
-    sudo su $BUILD_USER `pwd`/$SCRIPT_NAME $BUILD_MODE
+    sudo -E su $BUILD_USER `pwd`/$SCRIPT_NAME $BUILD_MODE
     exit $?
 fi
 
@@ -85,7 +86,7 @@ bash ./configure --with-freetype=system \
                  --with-version-opt="Alibaba" \
                  --with-version-build="${BUILD_NUMBER}" \
                  --with-version-feature="11" \
-                 --with-version-interim="0" \
+                 --with-version-interim="$VERSION_INTERIM" \
                  --with-version-update="$VERSION_UPDATE" \
                  --with-version-date="$(date +%Y-%m-%d)" \
                  --with-zlib=system \
