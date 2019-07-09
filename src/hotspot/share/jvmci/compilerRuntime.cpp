@@ -57,14 +57,10 @@ JRT_END
 
 Klass* CompilerRuntime::resolve_klass_helper(JavaThread *thread, const char* name, int len, TRAPS) {
   ResourceMark rm(THREAD);
-  // last java frame on stack (which includes native call frames)
-  RegisterMap cbl_map(thread, false);
-  // Skip stub
-  frame caller_frame = thread->last_frame().sender(&cbl_map);
-  CodeBlob* caller_cb = caller_frame.cb();
-  guarantee(caller_cb != NULL && caller_cb->is_compiled(), "must be called from compiled method");
-  CompiledMethod* caller_nm = caller_cb->as_compiled_method_or_null();
-  methodHandle caller(THREAD, caller_nm->method());
+
+  vframeStream vfst(thread, true);
+  assert(!vfst.at_end(), "Java frame must exist");
+  methodHandle caller(THREAD, vfst.method());
 
   // Use class loader of aot method.
   Handle loader(THREAD, caller->method_holder()->class_loader());
