@@ -11,8 +11,9 @@ fi
 
 DOCKER_IMAGE=reg.docker.alibaba-inc.com/ajdk/11.alios7
 SCRIPT_NAME=`basename $0`
-VERSION_INTERIM=1
-VERSION_UPDATE=4
+VERSION_INTERIM=0
+VERSION_UPDATE=3
+VERSION_PATCH=4
 MX=`pwd`/mx/mx
 BUILD_UID=`id -u ${USER}`
 
@@ -88,6 +89,7 @@ bash ./configure --with-freetype=system \
                  --with-version-feature="11" \
                  --with-version-interim="$VERSION_INTERIM" \
                  --with-version-update="$VERSION_UPDATE" \
+                 --with-version-patch="$VERSION_PATCH" \
                  --with-version-date="$(date +%Y-%m-%d)" \
                  --with-zlib=system \
                  --with-jvm-features=zgc
