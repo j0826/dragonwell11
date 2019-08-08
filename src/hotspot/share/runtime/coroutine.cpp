@@ -606,7 +606,7 @@ void WispThread::park(long millis, const ObjectWaiter* ow) {
     // the runtime can not handle the exception on monitorenter bci
     // we need clear it to prevent jvm crash
     if (jt->has_pending_exception()) {
-      assert(MultiTenant && TenantThreadStop && jt->has_tenant_death_exception(),
+      assert((MultiTenant && TenantThreadStop && jt->has_tenant_death_exception()) || jt->pending_exception()->klass() == SystemDictionary::ThreadDeath_klass(),
           "tenant_death_exception expceted");
       jt->clear_pending_exception();
     }
@@ -687,7 +687,8 @@ void WispThread::unpark(int task_id, bool using_wisp_park, bool proxy_unpark, Pa
   // ~tsm may produce an exception and c1 monitor_exit has an exception_mark
   // clear the exception to prevent jvm crash
   if (jt->has_pending_exception()) {
-    assert(MultiTenant && TenantThreadStop && jt->has_tenant_death_exception(),
+    assert((MultiTenant && TenantThreadStop && jt->has_tenant_death_exception()) ||
+            jt->pending_exception()->klass() == SystemDictionary::ThreadDeath_klass(),
         "tenant_death_exception expceted");
     jt->clear_pending_exception();
   }
@@ -787,7 +788,8 @@ void Coroutine::after_safepoint(JavaThread* thread) {
   coroutine->_is_yielding = false;
 
   if (thread->has_pending_exception() || thread->has_async_condition()) {
-    guarantee(MultiTenant && TenantThreadStop && thread->has_tenant_death_exception(),
+    guarantee((MultiTenant && TenantThreadStop && thread->has_tenant_death_exception()) ||
+            thread->pending_exception()->klass() == SystemDictionary::ThreadDeath_klass(),
         "tenant_death_exception expceted");
     thread->clear_pending_exception();
   }

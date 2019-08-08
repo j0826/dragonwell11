@@ -2225,19 +2225,15 @@ void JavaThread::disable_tenant_shutdown() {
 }
 
 void JavaThread::enable_tenant_shutdown() {
-  assert(MultiTenant && TenantThreadStop
-         && _tenant_shutdown_mark_level > TSM_idle, "pre-condition");
+  assert(MultiTenant && TenantThreadStop, "pre-condition");
   assert(this == Thread::current(), "Only allow to be called by current thread");
 
   if (EnableCoroutine && !current_coroutine()->is_thread_coroutine()) {
     return;
   }
 
-  if (_tenant_shutdown_mark_level > TSM_idle) {
-    Atomic::dec(&_tenant_shutdown_mark_level);
-  } else {
-    ShouldNotReachHere();
-  }
+  guarantee(_tenant_shutdown_mark_level > TSM_idle, "pre-condition");
+  Atomic::dec(&_tenant_shutdown_mark_level);
 
 #ifndef PRODUCT
   if (TraceTenantThreadStop) {
