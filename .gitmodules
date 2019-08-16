@@ -1,6 +1,0 @@
-[submodule "graalvm"]
-	path = graalvm
-	url = git@gitlab.alibaba-inc.com:xcode/graalvm.git
-[submodule "mx"]
-	path = mx
-	url = git@gitlab.alibaba-inc.com:xcode/mx.git
