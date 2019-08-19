@@ -17,8 +17,9 @@ public class StealTenantShutdownMaskedCoroutineTest {
 
         new Thread(() -> {
             co[0] = new Coroutine(() -> {
+                Coroutine threadCoro = Thread.currentThread().getCoroutineSupport().threadCoroutine();
                 TenantContainer.maskTenantShutdown();
-                Coroutine.yield();
+                Coroutine.yieldTo(threadCoro);
                 TenantContainer.unmaskTenantShutdown();
             });
 
