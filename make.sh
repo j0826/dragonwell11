@@ -73,7 +73,7 @@ if [ "x${BUILD_NUMBER}" = "x" ]; then
   BUILD_NUMBER=0
 fi
 
-export LDFLAGS_JDK="-L/vmfarm/tools/jemalloc/lib -ljemalloc"
+export LDFLAGS_JDK="-L/vmfarm/tools/jemalloc-4.5.0/lib -ljemalloc"
 bash ./configure --with-freetype=system \
                  --enable-unlimited-crypto \
                  --with-cacerts-file=/vmfarm/security/cacerts \
@@ -106,7 +106,7 @@ git checkout src/jdk.internal.vm.compiler.management
 git checkout make/CompileJavaModules.gmk
 
 \cp -f /vmfarm/tools/hsdis/8/amd64/hsdis-amd64.so  $NEW_JAVA_HOME/lib/
-\cp -f /vmfarm/tools/jemalloc/lib/libjemalloc.so.2 $NEW_JAVA_HOME/lib/
+\cp -f /vmfarm/tools/jemalloc-4.5.0/lib/libjemalloc.so.2 $NEW_JAVA_HOME/lib/
 
 # Sanity tests
 echo "================= Start sanity test ======================"
