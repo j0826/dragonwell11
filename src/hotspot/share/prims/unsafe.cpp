@@ -1171,6 +1171,17 @@ UNSAFE_ENTRY(jint, Unsafe_GetMaxVectorSize(JNIEnv *env, jobject unsafe, jobject 
   return -1;
 UNSAFE_END
 
+JVM_ENTRY (jobjectArray, CoroutineSupport_getCoroutineStack(JNIEnv* env, jclass klass, jlong coroPtr))
+  assert(EnableCoroutine, "pre-condition");
+
+  JvmtiVMObjectAllocEventCollector oam;
+
+  Coroutine* coro = (Coroutine*)coroPtr;
+
+  Handle stacktraces = ThreadService::dump_coroutine_stack_trace(coro, CHECK_NULL);
+  return (jobjectArray)JNIHandles::make_local(env, stacktraces());
+JVM_END
+
 /// JVM_RegisterUnsafeMethods
 
 #define ADR "J"
@@ -1262,6 +1273,7 @@ static JNINativeMethod jdk_internal_misc_Unsafe_methods[] = {
 
 #define COBA "Ljava/dyn/CoroutineBase;"
 #define COR "Ljava/dyn/Coroutine;"
+#define STE "Ljava/lang/StackTraceElement;"
 
 JNINativeMethod coroutine_support_methods[] = {
     {CC"switchTo",                CC"("COBA COBA")V", FN_PTR(CoroutineSupport_switchTo)},
@@ -1277,6 +1289,7 @@ JNINativeMethod coroutine_support_methods[] = {
     {CC"getNextCoroutine",        CC"(J)"COR,         FN_PTR(CoroutineSupport_getNextCoroutine)},
     {CC"moveCoroutine",           CC"(JJ)V",          FN_PTR(CoroutineSupport_moveCoroutine)},
     {CC"markThreadCoroutine",     CC"(J"COBA")V",     FN_PTR(CoroutineSupport_markThreadCoroutine)},
+    {CC"getCoroutineStack",       CC"(J)["STE,        FN_PTR(CoroutineSupport_getCoroutineStack)},
 };
 
 #define COMPILE_CORO_METHODS_BEFORE (3)
