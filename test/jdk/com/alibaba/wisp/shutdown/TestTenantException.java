@@ -10,6 +10,8 @@ import com.alibaba.tenant.TenantDeathException;
 
 import java.dyn.Coroutine;
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static jdk.testlibrary.Asserts.assertFalse;
@@ -85,5 +87,28 @@ public class TestTenantException {
 
         assertFalse(hasCatched.get());
         assertTrue(hasFinal.get());
+    }
+
+
+
+    private static void testSingleton() throws Exception {
+        CountDownLatch latch = new CountDownLatch(2);
+        final TenantDeathException singleton = new TenantDeathException();
+        for (int i = 0; i < 2; i++) {
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        throw singleton;
+                    } catch (Throwable t) {
+
+                    } finally {
+                        latch.countDown();
+                    }
+                }
+            }
+            ).start();
+        }
+        assertTrue(latch.await(2, TimeUnit.SECONDS));
     }
 }
