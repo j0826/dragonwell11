@@ -1168,7 +1168,7 @@ JVM_ENTRY (void, CoroutineSupport_checkAndThrowException0(JNIEnv* env, jclass kl
     if (MultiTenant && TenantThreadStop) {
       THROW_OOP(Universe::tenant_death_exception());
     } else {
-      throw_new(env, "ThreadDeath");
+      throw_new(env, "java/lang/ThreadDeath");
     }
   }
 JVM_END
