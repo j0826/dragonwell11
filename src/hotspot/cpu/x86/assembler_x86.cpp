@@ -6898,20 +6898,11 @@ void Assembler::evpandd(XMMRegister dst, KRegister mask, XMMRegister nds, XMMReg
 }
 
 void Assembler::vpandq(XMMRegister dst, XMMRegister nds, XMMRegister src, int vector_len) {
-  if (UseVectorAPI) {
-    assert(UseAVX > 2, "requires some form of EVEX");
-    InstructionAttr attributes(vector_len, /* vex_w */ VM_Version::supports_evex(), /* legacy_mode */ false, /* no_mask_reg */ false, /* uses_vl */ true);
-    attributes.set_rex_vex_w_reverted();
-    int encode = vex_prefix_and_encode(dst->encoding(), nds->encoding(), src->encoding(), VEX_SIMD_66, VEX_OPCODE_0F, &attributes);
-    emit_int8((unsigned char)0xDB);
-    emit_int8((unsigned char)(0xC0 | encode));
-  } else {
-    assert(VM_Version::supports_evex(), "");
-    InstructionAttr attributes(vector_len, /* vex_w */ true, /* legacy_mode */ false, /* no_mask_reg */ false, /* uses_vl */ true);
-    int encode = vex_prefix_and_encode(dst->encoding(), nds->encoding(), src->encoding(), VEX_SIMD_66, VEX_OPCODE_0F, &attributes);
-    emit_int8((unsigned char)0xDB);
-    emit_int8((unsigned char)(0xC0 | encode));
-  }
+  assert(VM_Version::supports_evex(), "");
+  InstructionAttr attributes(vector_len, /* vex_w */ true, /* legacy_mode */ false, /* no_mask_reg */ true, /* uses_vl */ true);
+  int encode = vex_prefix_and_encode(dst->encoding(), nds->encoding(), src->encoding(), VEX_SIMD_66, VEX_OPCODE_0F, &attributes);
+  emit_int8((unsigned char)0xDB);
+  emit_int8((unsigned char)(0xC0 | encode));
 }
 
 void Assembler::pandn(XMMRegister dst, XMMRegister src) {
