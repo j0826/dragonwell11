@@ -12,8 +12,8 @@ fi
 DOCKER_IMAGE=reg.docker.alibaba-inc.com/ajdk/11.alios7
 SCRIPT_NAME=`basename $0`
 VERSION_INTERIM=0
-VERSION_UPDATE=3
-VERSION_PATCH=4
+VERSION_UPDATE=4
+VERSION_PATCH=5
 MX=`pwd`/mx/mx
 BUILD_UID=`id -u ${USER}`
 
