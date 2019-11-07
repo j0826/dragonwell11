@@ -675,6 +675,9 @@ protected:
                                           Handle protection_domain,
                                           TRAPS);
   static InstanceKlass* load_instance_class(Symbol* class_name, Handle class_loader, TRAPS);
+#if INCLUDE_CDS
+  static void dump_class_and_loader_relationship(InstanceKlass* k, ClassLoaderData* initiating_loader_data, TRAPS);
+#endif
   static Handle compute_loader_lock_object(Handle class_loader, TRAPS);
   static void check_loader_lock_contention(Handle loader_lock, TRAPS);
   static bool is_parallelCapable(Handle class_loader);
@@ -696,7 +699,9 @@ public:
 
   static void initialize_oop_storage();
   static OopStorage* vm_weak_oop_storage();
-
+#if INCLUDE_CDS
+  static bool should_not_dump_class(InstanceKlass* k);
+#endif
 protected:
   static InstanceKlass* find_shared_class(Symbol* class_name);
 

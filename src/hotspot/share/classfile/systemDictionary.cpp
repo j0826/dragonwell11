@@ -1414,6 +1414,58 @@ void SystemDictionary::clear_invoke_method_table() {
     }
   }
 }
+
+bool SystemDictionary::should_not_dump_class(InstanceKlass* k) {
+  if (k->is_anonymous()) {
+    // Anonymous classes such as generated LambdaForm classes are not supported
+    return true;
+  }
+
+  const char *name = k->name()->as_C_string();
+  if (name[0] == '$') {
+    // ignore the name starts with "$", which is gened by javac.
+    return true;
+  }
+
+  if (strstr(name, "$$")) {
+    // ignore the class which is dynamically generated.
+    return true;
+  }
+  return false;
+}
+
+// Sample:
+// TestSimple klass: 0x0000000800066840 defining_loader_hash: fa474cbf initiating_loader_hash: fa474cbf
+void SystemDictionary::dump_class_and_loader_relationship(InstanceKlass* k, ClassLoaderData* initiating_loader_data, TRAPS) {
+  if (DumpLoadedClassList == NULL || !classlist_file->is_open()) {
+    return;
+  }
+
+  ResourceMark rm(THREAD);
+  if (should_not_dump_class(k)) {
+    return;
+  }
+
+  ClassLoaderData *defining_loader_data = k->class_loader_data();
+
+  if (defining_loader_data->is_builtin_class_loader_data()) {
+    return;    // don't dump the bootstrap. dummy.
+  }
+
+  int hash = java_lang_ClassLoader::signature(defining_loader_data->class_loader());
+
+  if (hash == 0 || java_lang_ClassLoader::signature(initiating_loader_data->class_loader()) == 0) {
+    return;
+  }
+
+  MutexLocker mu(DumpLoadedClassList_lock, THREAD);
+
+  classlist_file->print("%s klass: " INTPTR_FORMAT, k->name()->as_C_string(), p2i(k));
+  classlist_file->print(" defining_loader_hash: %x", hash);
+  classlist_file->print(" initiating_loader_hash: %x", java_lang_ClassLoader::signature(initiating_loader_data->class_loader()));
+  classlist_file->cr();
+  classlist_file->flush();
+}
 #endif // INCLUDE_CDS
 
 InstanceKlass* SystemDictionary::load_instance_class(Symbol* class_name, Handle class_loader, TRAPS) {
@@ -1552,6 +1604,11 @@ InstanceKlass* SystemDictionary::load_instance_class(Symbol* class_name, Handle 
       // the same as that requested.  This check is done for the bootstrap
       // loader when parsing the class file.
       if (class_name == k->name()) {
+#if INCLUDE_CDS
+        if (EagerAppCDS && DumpLoadedClassList != NULL) {
+          dump_class_and_loader_relationship(k, java_lang_ClassLoader::loader_data(class_loader()), THREAD);
+        }
+#endif
         return k;
       }
     }

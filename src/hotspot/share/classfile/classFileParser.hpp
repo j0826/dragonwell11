@@ -496,6 +496,10 @@ class ClassFileParser {
                      FieldLayoutInfo* info,
                      TRAPS);
 
+#if INCLUDE_CDS
+  void log_loaded_klass(InstanceKlass* k, const ClassFileStream* stream, TRAPS);
+#endif
+
  public:
   ClassFileParser(ClassFileStream* stream,
                   Symbol* name,

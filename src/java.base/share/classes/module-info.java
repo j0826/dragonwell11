@@ -131,6 +131,7 @@ module java.base {
     exports com.alibaba.aot;
     exports com.alibaba.tenant;
     exports com.alibaba.wisp.engine;
+    exports com.alibaba.util;
 
 
     // additional qualified exports may be inserted at build time

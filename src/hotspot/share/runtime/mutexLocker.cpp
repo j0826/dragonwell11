@@ -40,6 +40,7 @@
 Mutex*   Patching_lock                = NULL;
 Monitor* SystemDictionary_monitor_lock= NULL;
 Mutex*   SharedDictionary_lock        = NULL;
+Mutex*   DumpLoadedClassList_lock     = NULL;
 Mutex*   Module_lock                  = NULL;
 Mutex*   CompiledIC_lock              = NULL;
 Mutex*   InlineCacheBuffer_lock       = NULL;
@@ -268,6 +269,7 @@ void mutex_init() {
 
   def(SystemDictionary_monitor_lock, PaddedMonitor, leaf,        true,  Monitor::_safepoint_check_always);     // lookups done by VM thread
   def(SharedDictionary_lock        , PaddedMutex,   leaf,        true,  Monitor::_safepoint_check_always);     // lookups done by VM thread
+  def(DumpLoadedClassList_lock     , PaddedMutex,   leaf,        true,  Monitor::_safepoint_check_always);     // lookups done by VM thread
   def(Module_lock                  , PaddedMutex  , leaf+2,      true,  Monitor::_safepoint_check_always);
   def(InlineCacheBuffer_lock       , PaddedMutex  , leaf,        true,  Monitor::_safepoint_check_always);
   def(VMStatistic_lock             , PaddedMutex  , leaf,        false, Monitor::_safepoint_check_always);
