@@ -2141,7 +2141,7 @@ JavaThread* JavaThread::active() {
 
 void JavaThread::clear_tenant_death_exception() {
   assert(MultiTenant && TenantThreadStop, "pre-condition");
-  if (NULL != _pending_async_exception
+  if (_pending_async_exception != NULL
       && _pending_async_exception == Universe::tenant_death_exception()) {
     _pending_async_exception = NULL;
     _special_runtime_exit_condition = _no_async_condition;
@@ -5408,7 +5408,7 @@ void Threads::verify() {
 }
 
 void Threads::kill_threads_of_tenant(oop tenant_obj, jboolean os_wake_up) {
-  assert(MultiTenant && TenantThreadStop && NULL != tenant_obj, "pre-condition");
+  assert(MultiTenant && TenantThreadStop && tenant_obj != NULL, "pre-condition");
 
   VM_StopTenantThreads* vm_op = new VM_StopTenantThreads(tenant_obj, JNI_TRUE == os_wake_up);
   VMThread::execute(vm_op);
@@ -5437,7 +5437,7 @@ void Threads::mark_threads_for_tenant_shutdown(oop tenant_obj, bool os_wake_up) 
           && !thread->is_tenant_shutdown_masked()
           && thread->try_start_tenant_shutdown()) {
 
-        assert(NULL != thread->threadObj(), "Just checking");
+        assert(thread->threadObj() != NULL, "Just checking");
 
 #ifndef PRODUCT
         if (MultiTenant && TenantThreadStop && TraceTenantThreadStop) {

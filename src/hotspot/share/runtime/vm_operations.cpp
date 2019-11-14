@@ -550,7 +550,7 @@ void VM_StopTenantThreads::doit() {
 // GC support
 void VM_StopTenantThreads::oops_do(OopClosure* f) {
   assert(MultiTenant, "pre-condition");
-  if (NULL != f && NULL != _tenant_obj) {
+  if (NULL != f && _tenant_obj != NULL) {
     f->do_oop(&_tenant_obj);
   }
 }

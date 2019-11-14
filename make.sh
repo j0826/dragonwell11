@@ -1,7 +1,7 @@
 #!/bin/bash
 ARGNUM=$#
 if [ $ARGNUM != 1 -a $ARGNUM != 3 ]; then 
-  echo "USAGE: $0 release/debug or $0 release/debug username uid (docker mode)"
+  echo "USAGE: $0 release/debug/fastdebug or $0 release/debug/fastdebug username uid (docker mode)"
   exit
 elif [ $# -eq 1 ]; then
   PREBUILD=0
@@ -61,8 +61,12 @@ case "$BUILD_MODE" in
         DEBUG_LEVEL="slowdebug"
         JDK_IMAGES_DIR=`pwd`/build/linux-x86_64-normal-server-slowdebug/images
     ;;
+    fastdebug)
+        DEBUG_LEVEL="fastdebug"
+        JDK_IMAGES_DIR=`pwd`/build/linux-x86_64-normal-server-fastdebug/images
+    ;;
     *)
-        echo "Argument must be release or debug!"
+        echo "Argument must be release, debug or fastdebug!"
         exit 1
     ;;
 esac
