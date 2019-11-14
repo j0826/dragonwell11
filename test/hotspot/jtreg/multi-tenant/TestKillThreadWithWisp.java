@@ -2,8 +2,10 @@
  * @test
  * @summary Test function of killing tenants' threads with Wisp
  * @library /test/lib
- * @run main/othervm/timeout=20 -XX:+MultiTenant -XX:+TenantThreadStop -Dcom.alibaba.tenant.KillThreadInterval=1000 -XX:+TraceTenantThreadStop
- *                              -XX:+EnableCoroutine -XX:-UseBiasedLocking -XX:+UseWispMonitor -Dcom.alibaba.transparentAsync=true -Dcom.alibaba.wisp.version=2 -Dcom.alibaba.wisp.enableHandOff=false
+ * @run main/othervm/timeout=20 -XX:+IgnoreUnrecognizedVMOptions -XX:+MultiTenant -XX:+TenantThreadStop
+ *                              -Dcom.alibaba.tenant.KillThreadInterval=1000 -XX:+TraceTenantThreadStop
+ *                              -XX:+EnableCoroutine -XX:-UseBiasedLocking -XX:+UseWispMonitor -Dcom.alibaba.transparentAsync=true
+ *                              -Dcom.alibaba.wisp.version=2 -Dcom.alibaba.wisp.enableHandOff=false
  *                              TestKillThreadWithWisp
  */
 

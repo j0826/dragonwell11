@@ -723,7 +723,7 @@ void WispThread::park(long millis, const ObjectWaiter* ow) {
     // we need clear it to prevent jvm crash
     if (jt->has_pending_exception()) {
       assert((MultiTenant && TenantThreadStop && jt->has_tenant_death_exception()) || jt->pending_exception()->klass() == SystemDictionary::ThreadDeath_klass(),
-          "tenant_death_exception expceted");
+          "tenant_death_exception expected");
       jt->clear_pending_exception();
     }
 
@@ -803,11 +803,10 @@ void WispThread::unpark(int task_id, bool using_wisp_park, bool proxy_unpark, Pa
   {
     TenantShutdownMark tsm(jt);
     // unpark is very important, should not interruted by tenant shutdown
-    assert(!TenantThreadStop || jt->is_tenant_shutdown_masked(), "should be masked!");
+    assert(!TenantThreadStop || !jt->current_coroutine()->is_thread_coroutine() || jt->is_tenant_shutdown_masked(), "should be masked!");
     assert(unparkMethod != NULL, "unparkMethod should be resolved in set_wisp_booted");
     wisp_thread->_unpark_status = WispThread::_wisp_unpark_before_call_java;
     JavaCalls::call(&result, methodHandle(unparkMethod), &args, jt);
-    assert(!TenantThreadStop || jt->is_tenant_shutdown_masked(), "should be masked!");
     wisp_thread->_unpark_status = WispThread::_wisp_unpark_after_call_java;
   }
   // ~tsm may produce an exception and c1 monitor_exit has an exception_mark
@@ -815,7 +814,7 @@ void WispThread::unpark(int task_id, bool using_wisp_park, bool proxy_unpark, Pa
   if (jt->has_pending_exception()) {
     assert((MultiTenant && TenantThreadStop && jt->has_tenant_death_exception()) ||
             jt->pending_exception()->klass() == SystemDictionary::ThreadDeath_klass(),
-        "tenant_death_exception expceted");
+        "tenant_death_exception expected");
     wisp_thread->_has_exception = true;
     jt->clear_pending_exception();
   }
@@ -976,7 +975,7 @@ void Coroutine::after_safepoint(JavaThread* thread) {
   if (thread->has_pending_exception() || thread->has_async_condition()) {
     guarantee((MultiTenant && TenantThreadStop && thread->has_tenant_death_exception()) ||
             thread->pending_exception()->klass() == SystemDictionary::ThreadDeath_klass(),
-        "tenant_death_exception expceted");
+        "tenant_death_exception expected");
     thread->clear_pending_exception();
   }
 }
