@@ -208,7 +208,6 @@ CodeBlob* Runtime1::generate_blob(BufferBlob* buffer_blob, int stub_id, const ch
   assert(oop_maps == NULL || sasm->frame_size() != no_frame_size,
          "if stub has an oop map it must have a valid frame size");
   assert(!expect_oop_map || oop_maps != NULL, "must have an oopmap");
-
   // align so printing shows nop's instead of random code at the end (SimpleStubs are aligned)
   sasm->align(BytesPerWord);
   // make sure all code is in code buffer
@@ -241,11 +240,6 @@ void Runtime1::generate_blob_for(BufferBlob* buffer_blob, StubID id) {
   case counter_overflow_id:
 #if defined(SPARC) || defined(PPC32)
   case handle_exception_nofpu_id:  // Unused on sparc
-#endif
-#ifdef AARCH64
-  //TODO: fix this when enabling wisp on aarch64
-  case monitorexit_proxy_id:
-  case monitorexit_nofpu_proxy_id:
 #endif
     expect_oop_map = false;
     break;
