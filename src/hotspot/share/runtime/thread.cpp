@@ -3917,6 +3917,10 @@ void Threads::initialize_java_lang_classes(JavaThread* main_thread, TRAPS) {
   JDK_Version::set_runtime_name(get_java_runtime_name(THREAD));
   JDK_Version::set_runtime_version(get_java_runtime_version(THREAD));
 
+  if (MultiTenant && TenantThreadStop) {
+    initialize_class(vmSymbols::com_alibaba_tenant_TenantDeathException(), CHECK);
+  }
+
   // an instance of OutOfMemory exception has been allocated earlier
   initialize_class(vmSymbols::java_lang_OutOfMemoryError(), CHECK);
   initialize_class(vmSymbols::java_lang_NullPointerException(), CHECK);

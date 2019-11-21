@@ -202,6 +202,14 @@ int Method::fast_exception_handler_bci_for(const methodHandle& mh, Klass* ex_kla
   // access exception table
   ExceptionTable table(mh());
   int length = table.length();
+  bool is_tenant_death_exception = false;
+  if (MultiTenant && TenantThreadStop) {
+    Klass* tenant_death_class = SystemDictionary::com_alibaba_tenant_TenantDeathException_klass();
+    assert(NULL != tenant_death_class, "pre-condition");
+    if (ex_klass == tenant_death_class || ex_klass->is_subtype_of(tenant_death_class)) {
+      is_tenant_death_exception = true;
+    }
+  }
   // iterate through all entries sequentially
   constantPoolHandle pool(THREAD, mh->constants());
   for (int i = 0; i < length; i ++) {
@@ -225,6 +233,11 @@ int Method::fast_exception_handler_bci_for(const methodHandle& mh, Klass* ex_kla
         Klass* k = pool->klass_at(klass_index, CHECK_(handler_bci));
         assert(k != NULL, "klass not loaded");
         if (ex_klass->is_subtype_of(k)) {
+	  // if the exception is a TenantDeathException, skip all the Throwable catchers
+          if (MultiTenant && TenantThreadStop
+              && is_tenant_death_exception && THREAD->is_Java_thread()) {
+            continue;
+          }
           return handler_bci;
         }
       }
