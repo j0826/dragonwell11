@@ -118,7 +118,7 @@ fi
 
 # Do jaotc compilation
 echo "aot compilation"
-${JAOTC} --output ${AOT_LIB} -J-Dgraal.PrintCompilation=true --verbose -J-cp -J${SUB_DIR} -J-Dgraal.AOTSkipSpecialInlining=false -J-Dgraal.AOTInliningClassInitialization=true ${TEST_SUB_CLASS}.class > aotc.log
+${JAOTC} --output ${AOT_LIB} -J-Dgraal.PrintCompilation=true --verbose -J-cp -J${SUB_DIR} -J-Dgraal.AOTInliningClassInitialization=true ${TEST_SUB_CLASS}.class > aotc.log
 if [ $? != '0' ]
 then
 	printf "Failed to aot compile ${SUB_DIR}${FS}${TEST_SUB_SOURCE}.class"
