@@ -242,8 +242,8 @@ function check_output()
 
   # check aot method is executed
   echo "check aot method"
-  aot_method_messages=`grep "A.testA()Ljava/lang/String;" ${TEST_LOG_PATH} | grep aot | wc -l`
-  if [[ $aot_method_messages -ne 1 ]]; then
+  aot_method_messages=`grep -E "aot\\[.*A.testA\\(\\)Ljava/lang/String;" ${TEST_LOG_PATH} | grep aot | wc -l`
+  if [[ $aot_method_messages == 0 ]]; then
     echo "aot method  A.testA  is **not executed**"
     exit -1
   fi
