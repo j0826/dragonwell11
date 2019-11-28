@@ -471,22 +471,32 @@ void CoroutineStack::frames_do(FrameClosure* fc) {
   DEBUG_CORO_ONLY(tty->print_cr("frames_do stack %08x", _stack_base));
 
   intptr_t* fp = ((intptr_t**)_last_sp)[0];
-  if (fp != NULL) {
-    address pc = ((address*)_last_sp)[1];
-    intptr_t* sp = ((intptr_t*)_last_sp) + 2;
+  address pc = ((address*)_last_sp)[1];
+  intptr_t* sp = ((intptr_t*)_last_sp) + 2;
 
-    frame fr(sp, fp, pc);
-    StackFrameStream fst(_thread, fr);
+  frame fr(sp, fp, pc);
+
+#ifdef ASSERT
+  // if fp == NULL, it must be that frame pointer register is used as a general register
+  // in compiled code and the frame pointer register is written to 0 when the code's running.
+  if (fp == NULL) {
+    assert(fr.is_first_frame() || (!PreserveFramePointer && !fr.is_interpreted_frame() && CodeCache::find_blob(pc)), "FP is NULL only if sender frame is a JavaCalls::call() frame, or a compiler frame && -XX:-PreserveFramePointer");
+  }
+#endif
+
+  // the `fp` here is useful only if the sender is an interpreter/native frame.
+  // see comments in `frame::sender()`
+  // if the sender is a compiler frame, we cannot assume its value.
+  StackFrameStream fst(_thread, fr);
 #ifdef X86
-    fst.register_map()->set_location(rbp->as_VMReg(), (address)_last_sp);
+  fst.register_map()->set_location(rbp->as_VMReg(), (address)_last_sp);
 #else
-    // TODO: fix this on aarch64
-    guarantee(false, "Wisp is not supported on this arch");
+  // TODO: fix this on aarch64
+  guarantee(false, "Wisp is not supported on this arch");
 #endif // X86
-    fst.register_map()->set_include_argument_oops(false);
-    for(; !fst.is_done(); fst.next()) {
-      fc->frames_do(fst.current(), fst.register_map());
-    }
+  fst.register_map()->set_include_argument_oops(false);
+  for(; !fst.is_done(); fst.next()) {
+    fc->frames_do(fst.current(), fst.register_map());
   }
 }
 
@@ -494,20 +504,25 @@ frame CoroutineStack::last_frame(Coroutine* coro, RegisterMap& map) const {
   DEBUG_CORO_ONLY(tty->print_cr("last_frame CoroutineStack"));
 
   intptr_t* fp = ((intptr_t**)_last_sp)[0];
-  assert(fp != NULL, "coroutine with NULL fp");
-
   address pc = ((address*)_last_sp)[1];
   intptr_t* sp = ((intptr_t*)_last_sp) + 2;
 
 #ifdef X86
   map.set_location(rbp->as_VMReg(), (address)_last_sp);
 #else
-    // TODO: fix this on aarch64
-    guarantee(false, "Wisp is not supported on this arch");
+  // TODO: fix this on aarch64
+  guarantee(false, "Wisp is not supported on this arch");
 #endif // X86
   map.set_include_argument_oops(false);
 
-  return frame(sp, fp, pc);
+  frame f(sp, fp, pc);
+#ifdef ASSERT
+  if (fp == NULL) {
+    assert(f.is_first_frame() || (!PreserveFramePointer && !f.is_interpreted_frame() && CodeCache::find_blob(pc)), "FP is NULL only if sender frame is a JavaCalls::call() frame, or a compiler frame && -XX:-PreserveFramePointer");
+  }
+#endif
+
+  return f;
 }
 
 oop Coroutine::print_stack_header_on(outputStream* st) {
