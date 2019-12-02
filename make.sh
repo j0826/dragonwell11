@@ -80,10 +80,10 @@ fi
 export LDFLAGS_JDK="-L/vmfarm/tools/jemalloc-4.5.0/lib -ljemalloc"
 bash ./configure --with-freetype=system \
                  --enable-unlimited-crypto \
-                 --with-cacerts-file=/vmfarm/security/cacerts \
                  --with-jtreg=/vmfarm/tools/jtreg4.2 \
                  --with-jvm-variants=server \
-                 --with-debug-level=$DEBUG_LEVEL \
+                 --with-debug-level=${DEBUG_LEVEL} \
+                 --with-cacerts-file=`pwd`/make/data/security/cacerts \
                  --with-vendor-name="Alibaba" \
                  --with-vendor-url="http://www.alibabagroup.com" \
                  --with-vendor-bug-url="mailto:jvm@list.alibaba-inc.com" \
