@@ -1390,6 +1390,9 @@ JVM_GetProxyUnpark(JNIEnv* env, jclass clz, jintArray res);
 
 JNIEXPORT void JNICALL
 JVM_MarkPreempted(JNIEnv* env, jclass clz, jobject thread, jboolean force);
+
+JNIEXPORT jclass JNICALL
+JVM_DefineClassFromCDS(JNIEnv *env, jclass clz, jobject loader, jobject pd, jlong iklass);
 #ifdef __cplusplus
 } /* extern "C" */
 

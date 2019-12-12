@@ -1566,6 +1566,19 @@ InstanceKlass* SystemDictionary::load_instance_class(Symbol* class_name, Handle 
     assert(THREAD->is_Java_thread(), "must be a JavaThread");
     JavaThread* jt = (JavaThread*) THREAD;
 
+    // when coming here, class_loader() can not be null.
+    if (EagerAppCDS && UseSharedSpaces && java_lang_ClassLoader::signature(class_loader()) != 0) {
+      char* name = class_name->as_C_string();
+      // Only boot and platform class loaders can define classes in "java/" packages
+      // in EagerAppCDS, ignore the classes in "java/" packages
+      if (!(strncmp(name, JAVAPKG, JAVAPKG_LEN) == 0 && name[JAVAPKG_LEN] == '/')) {
+        InstanceKlass *k = SystemDictionaryShared::lookup_shared(class_name, class_loader, CHECK_NULL);
+        if (k) {
+          return k;
+        }
+      }
+    }
+
     PerfClassTraceTime vmtimer(ClassLoader::perf_app_classload_time(),
                                ClassLoader::perf_app_classload_selftime(),
                                ClassLoader::perf_app_classload_count(),

@@ -211,6 +211,23 @@ public class Classes4CDS {
         out.println();
     }
 
+    private void decodeSource(CDSData data) throws Exception {
+        if (data.source == null) {
+            return;
+        }
+        String source = data.source;  // convenience
+        if (source.contains("file:")) {
+            // regular jar case
+            // file:<dir/<main jar>
+            int index = source.indexOf("file:");
+            index += "file:".length();
+            while(source.charAt(index) == ' ') {
+                index++;
+            }
+            data.source = source.substring(index);
+        }
+    }
+
     HashMap<String, String> idIds = new HashMap<String, String>();
     HashMap<String, CDSData> nameCDSData = new HashMap<String, CDSData>();
     List<CDSData> all = new ArrayList<CDSData>();
@@ -263,6 +280,14 @@ public class Classes4CDS {
         data.superId = null;
         idIds.put(data.id, "1");
         data.id = "1";
+        try {
+            decodeSource(data);
+        } catch (Exception e) {
+            System.out.println("Error happened, Exception is " + e);
+            e.printStackTrace();
+            status = false;
+            return;
+        }
         printCDSData(data);
         for (int i = 1; i < all.size(); i++) {
             data = all.get(i);
@@ -278,6 +303,14 @@ public class Classes4CDS {
                     data.interfaceIds.remove(j);
                     data.interfaceIds.add(j, iid);
                 }
+            }
+            try {
+                decodeSource(data);
+            } catch (Exception e) {
+                System.out.println("Error happened, Exception is " + e);
+                e.printStackTrace();
+                status = false;
+                return;
             }
             printCDSData(data);
         }

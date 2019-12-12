@@ -44,6 +44,9 @@ public class TestDumpAndLoadClass {
 
         // create an archive using the classlist
         dumpArchive();
+
+        // start the java process with shared archive file
+        startWithJsa();
     }
 
     public static List<String> toClassNames(String filename) throws IOException {
@@ -118,6 +121,7 @@ public class TestDumpAndLoadClass {
             "-XX:+EagerAppCDS",
             "-XX:SharedClassListFile=" + CLASSLIST_FILE_2,
             "-XX:SharedArchiveFile=" + ARCHIVE_FILE,
+            "-Xlog:class+eagerappcds=trace",
             "-Xshare:dump",
             "-XX:MetaspaceSize=12M",
             "-XX:MaxMetaspaceSize=12M");
@@ -132,4 +136,21 @@ public class TestDumpAndLoadClass {
             throw new RuntimeException("Unexpected exit value " + exitValue);
         }
     }
+
+    static void startWithJsa() throws Exception {
+        ProcessBuilder pb = ProcessTools.createJavaProcessBuilder(true,
+            "-Dtest.classes=" + TEST_CLASS,
+            "-XX:+EagerAppCDS",
+            "-Xshare:on",
+            "-XX:SharedArchiveFile=" + ARCHIVE_FILE,
+            "-Xlog:class+eagerappcds=trace",
+            "-cp",
+            TESTJAR,
+            TESTNAME);
+
+        OutputAnalyzer output = CDSTestUtils.executeAndLog(pb, "start-with-shared-archive")
+            .shouldHaveExitValue(0);
+        output.shouldNotContain("[CDS load class Failed");
+    }
+
 }

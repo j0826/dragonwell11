@@ -5790,6 +5790,8 @@ void ClassFileParser::log_loaded_klass(InstanceKlass* ik, const ClassFileStream 
   if (is_builtin) {
     if(!should_skip_class(loader_data, stream)) {
       classlist_file->print("%s klass: " INTPTR_FORMAT, name, p2i(ik));
+    } else {
+      return;
     }
   } else {
     if (SystemDictionary::should_not_dump_class(ik)) {

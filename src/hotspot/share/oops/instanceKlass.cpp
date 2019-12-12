@@ -2271,6 +2271,9 @@ void InstanceKlass::metaspace_pointers_do(MetaspaceClosure* it) {
   it->push(&_method_ordering);
   it->push(&_default_vtable_indices);
   it->push(&_fields);
+  if (EagerAppCDS) {
+    it->push(&_source_file_path);
+  }
 
   if (itable_length() > 0) {
     itableOffsetEntry* ioe = (itableOffsetEntry*)start_of_itable();

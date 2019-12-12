@@ -154,6 +154,10 @@ public:
     return loader_type() == LT_UNREGISTERED;
   }
 
+  int initiating_loader_hash() {
+    return _initiating_loader_hash;
+  }
+
   void add_verification_constraint(Symbol* name,
          Symbol* from_name, bool from_field_is_protected, bool from_is_array, bool from_is_object);
   int finalize_verification_constraints();
@@ -163,9 +167,6 @@ public:
 
 class SharedDictionary : public Dictionary {
   SharedDictionaryEntry* get_entry_for_builtin_loader(const Symbol* name) const;
-  SharedDictionaryEntry* get_entry_for_unregistered_loader(const Symbol* name,
-                                                           int clsfile_size,
-                                                           int clsfile_crc32) const;
 
   // Convenience functions
   SharedDictionaryEntry* bucket(int index) const {
@@ -173,6 +174,10 @@ class SharedDictionary : public Dictionary {
   }
 
 public:
+  SharedDictionaryEntry* get_entry_for_unregistered_loader(const Symbol* name,
+                                                           int clsfile_size,
+                                                           int clsfile_crc32) const;
+
   SharedDictionaryEntry* find_entry_for(Klass* klass);
   void finalize_verification_constraints();
 
@@ -264,6 +269,7 @@ private:
     // result is used by all threads, and all future queries.
     array->atomic_compare_exchange_oop(index, o, NULL);
   }
+  static InstanceKlass* load_class_from_cds(const Symbol* class_name, Handle class_loader, InstanceKlass* ik, int hash, TRAPS);
 
   static oop shared_protection_domain(int index);
   static void atomic_set_shared_protection_domain(int index, oop pd) {
@@ -360,6 +366,15 @@ public:
                                            Handle protection_domain,
                                            const ClassFileStream* st,
                                            TRAPS);
+
+  static InstanceKlass* lookup_shared(const Symbol* class_name,
+                                      Handle class_loader, TRAPS);
+
+  static InstanceKlass* define_class_from_cds(InstanceKlass *ik,
+                                              Handle class_loader,
+                                              Handle protection_domain,
+                                              TRAPS);
+
   // "verification_constraints" are a set of checks performed by
   // VerificationType::is_reference_assignable_from when verifying a shared class during
   // dump time.

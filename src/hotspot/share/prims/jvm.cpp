@@ -2397,6 +2397,19 @@ JVM_ENTRY(jobject, JVM_AssertionStatusDirectives(JNIEnv *env, jclass unused))
   return JNIHandles::make_local(env, asd);
 JVM_END
 
+JVM_ENTRY(jclass, JVM_DefineClassFromCDS(JNIEnv *env, jclass clz, jobject loader, jobject pd, jlong iklass))
+  JVMWrapper("JVM_DefineClassFromCDS");
+  ResourceMark rm(THREAD);
+  HandleMark hm(THREAD);
+
+  Handle protection_domain (THREAD, JNIHandles::resolve(pd));
+  Handle class_loader (THREAD, JNIHandles::resolve(loader));
+  InstanceKlass* loaded = SystemDictionaryShared::define_class_from_cds((InstanceKlass*) iklass, class_loader,
+                                                                         protection_domain, THREAD);
+
+  return loaded ? (jclass)JNIHandles::make_local(env, loaded->java_mirror()) : NULL;
+JVM_END
+
 // Verification ////////////////////////////////////////////////////////////////////////////////
 
 // Reflection for the verifier /////////////////////////////////////////////////////////////////

@@ -624,6 +624,154 @@ InstanceKlass* SystemDictionaryShared::lookup_from_stream(const Symbol* class_na
                                           protection_domain, THREAD);
 }
 
+InstanceKlass* SystemDictionaryShared::load_class_from_cds(const Symbol* class_name,
+                                                           Handle class_loader, InstanceKlass* ik, int defining_loader_hash, TRAPS) {
+  JavaValue result(T_OBJECT);
+
+  JavaCallArguments args(4);
+  args.set_receiver(class_loader);
+  // arg 1 className
+  Handle s = java_lang_String::create_from_symbol(const_cast<Symbol*>(class_name), CHECK_NULL);
+  // Translate to external class name format, i.e., convert '/' chars to '.'
+  Handle string = java_lang_String::externalize_classname(s, CHECK_NULL);
+  args.push_oop(string);
+  // arg 2 sourcePath
+  Symbol *path = ik->source_file_path();
+  Handle url = java_lang_String::create_from_symbol(path, CHECK_NULL);
+  args.push_oop(url);
+  // arg 3 ik
+  jlong ik_ptr = (jlong)ik;
+  args.push_long(ik_ptr);
+  // arg 4 definingLoaderHash
+  args.push_int(defining_loader_hash);
+
+  InstanceKlass* spec_klass = SystemDictionary::ClassLoader_klass();
+
+  JavaCalls::call_virtual(&result,
+                          spec_klass,
+                          vmSymbols::loadClassFromCDS_name(),
+                          vmSymbols::loadClassFromCDS_signature(),
+                          &args,
+                          CHECK_NULL);
+
+  oop klass = (oop)result.get_jobject();
+  if (klass != NULL) {
+    return InstanceKlass::cast(java_lang_Class::as_Klass(klass));
+  }
+  return NULL;
+}
+
+/*
+                                      +-------------------------------------+
+                                      |SystemDictionaryShared::lookup_shared|
+                                      +-------------------------------------+
+                                        Find Entry in SharedDictionary
+       +----------------------------+                |                        +---------------------+
+       |   load_class_from_cds (vm) +----------------+------------------------+  loadClass (Java)   |
+       |                            |     YES                 NO              |                     |
+       +------------+---------------+                                         +---------------------+
+                    |
+       +------------v-------------+
+       |  loadClassFromCDS (Java) |
+       +------------+-------------+
+                    |
+       +------------v-------------+      NO     +-------------------------------------------+
+       |Find defining class loader+-------------+ throw exception (fall back to normal path)|
+       +--------------------------+             +-------------------------------------------+
+                 YES|
+       +------------v------------------------+
+       | definingClassLoader.findClassFromCDS|
+       +-------------------------------------+
+                    |
+       +------------v--------------------------+
+       | definieClassLoader.defineClassFromCDS |
+       +---------------------------------------+
+                    |
+       +------------v----------------+
+       | JVM_DefineClassFromCDS (vm) |
+       +------------+----------------+
+                    |
+       +------------v---------------------+
+       | acquire_class_for_current_thread |
+       +------------+---------------------+
+                    |
+       +------------v-----------+
+       | define_instance_class  |
+       +------------+-----------+
+                    |
+       +------------v--------------------------------+
+       | load successfully, and return InstanceKlass |
+       +---------------------------------------------+
+*/
+InstanceKlass* SystemDictionaryShared::lookup_shared(const Symbol* class_name,
+                                                     Handle class_loader, TRAPS) {
+  assert(EagerAppCDS, "must be EagerAppCDS");
+
+  bool loop = false;
+
+  int loader_hash = java_lang_ClassLoader::signature(class_loader());
+  for (SharedDictionaryEntry* entry = shared_dictionary()->get_entry_for_unregistered_loader(class_name, -1, -1);
+       entry; entry = entry->next()) {
+    Klass* k = entry->literal();
+
+    loop = true;
+
+    if (InstanceKlass::cast(k)->name() == class_name &&
+        entry->_initiating_loader_hash == loader_hash) {
+      InstanceKlass* ik = InstanceKlass::cast(k);
+
+      InstanceKlass *loaded = load_class_from_cds(class_name, class_loader, ik, entry->_defining_loader_hash, THREAD);
+      if (loaded != NULL) {
+        return loaded;
+      }
+    }
+  }
+
+  if (log_is_enabled(Trace, class, eagerappcds)) {
+    ResourceMark rm;
+    log_trace(class, eagerappcds) ("[CDS load class] Failed to load class %s with class loader %s (%x) since %s", class_name->as_C_string(),
+              class_loader()->klass()->name()->as_C_string(), loader_hash,
+              loop ? "failed to load from jsa" : " the class isn't in shared dictionary");
+  }
+  return NULL;
+}
+
+InstanceKlass* SystemDictionaryShared::define_class_from_cds(
+                   InstanceKlass *ik,
+                   Handle class_loader,
+                   Handle protection_domain,
+                   TRAPS) {
+
+  ClassLoaderData* loader_data = register_loader(class_loader);
+  InstanceKlass* k = acquire_class_for_current_thread(ik, class_loader, protection_domain, THREAD);
+  if (!k) {
+    return NULL;
+  }
+  Symbol* h_name = k->name();
+  // Add class just loaded
+  // If a class loader supports parallel classloading handle parallel define requests
+  // find_or_define_instance_class may return a different InstanceKlass
+  if (is_parallelCapable(class_loader)) {
+    InstanceKlass* defined_k = find_or_define_instance_class(h_name, class_loader, k, THREAD);
+    if (!HAS_PENDING_EXCEPTION && defined_k != k) {
+      // If a parallel capable class loader already defined this class, register 'k' for cleanup.
+      assert(defined_k != NULL, "Should have a klass if there's no exception");
+      loader_data->add_to_deallocate_list(k);
+      k = defined_k;
+    }
+  } else {
+    define_instance_class(k, THREAD);
+  }
+
+  // If defining the class throws an exception register 'k' for cleanup.
+  if (HAS_PENDING_EXCEPTION) {
+    assert(k != NULL, "Must have an instance klass here!");
+    loader_data->add_to_deallocate_list(k);
+    return NULL;
+  }
+  return k;
+}
+
 InstanceKlass* SystemDictionaryShared::acquire_class_for_current_thread(
                    InstanceKlass *ik,
                    Handle class_loader,

@@ -446,6 +446,12 @@ public class URLClassLoader extends SecureClassLoader implements Closeable {
     protected Class<?> findClass(final String name)
         throws ClassNotFoundException
     {
+        return findClassInternal(name, false, null, 0);
+    }
+
+    private Class<?> findClassInternal(final String name, boolean eagerAppCDSFastPath, String sourcepath, long ik)
+        throws ClassNotFoundException
+    {
         final Class<?> result;
         try {
             result = AccessController.doPrivileged(
@@ -455,7 +461,11 @@ public class URLClassLoader extends SecureClassLoader implements Closeable {
                         Resource res = ucp.getResource(path, false);
                         if (res != null) {
                             try {
-                                return defineClass(name, res);
+                                if (eagerAppCDSFastPath) {
+                                    return defineClassFromCDS(name, res, ik);
+                                } else {
+                                    return defineClass(name, res);
+                                }
                             } catch (IOException e) {
                                 throw new ClassNotFoundException(name, e);
                             }
@@ -502,12 +512,42 @@ public class URLClassLoader extends SecureClassLoader implements Closeable {
         return pkg;
     }
 
+    /**
+     * Finds and loads the class in CDS flow.
+     *
+     * @param name the name of the class
+     *
+     * @param sourcepath the path to load the class
+     *
+     * @param ik instance class
+     *
+     * @return the resulting class
+     *
+     * @exception ClassNotFoundException if the class could not be found,
+     *            or if the loader is closed.
+     */
+    protected Class<?> findClassFromCDS(String name, String sourcepath, long ik)
+        throws ClassNotFoundException {
+        return findClassInternal(name, true, sourcepath, ik);
+    }
+
+    /**
+     * Defines a Class for CDS flow
+     */
+    private Class<?> defineClassFromCDS(String name, Resource res, long ik) throws IOException {
+        return defineClassInternal(name, res, true, ik);
+    }
+
     /*
      * Defines a Class using the class bytes obtained from the specified
      * Resource. The resulting Class must be resolved before it can be
      * used.
      */
     private Class<?> defineClass(String name, Resource res) throws IOException {
+        return defineClassInternal(name, res, false, 0);
+    }
+
+    private Class<?> defineClassInternal(String name, Resource res, boolean eagerAppCDSFastPath, long ik) throws IOException {
         long t0 = System.nanoTime();
         int i = name.lastIndexOf('.');
         URL url = res.getCodeSourceURL();
@@ -532,6 +572,13 @@ public class URLClassLoader extends SecureClassLoader implements Closeable {
                     }
                 }
             }
+        }
+
+        if (eagerAppCDSFastPath) {
+            CodeSigner[] signers = res.getCodeSigners();
+            CodeSource cs = new CodeSource(url, signers);
+            PerfCounter.getReadClassBytesTime().addElapsedTimeFrom(t0);
+            return defineClassFromCDS(name, ik, cs);
         }
         // Now read the class bytes and define the class
         java.nio.ByteBuffer bb = res.getByteBuffer();

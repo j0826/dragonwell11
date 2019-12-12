@@ -46,4 +46,8 @@ public class Utils {
         hash2Loader.put(signature, new WeakReference<>(loader));
         JLCA.setSignature(loader, signature);
     }
+
+    public static WeakReference<ClassLoader> getClassLoader(int signature) {
+        return hash2Loader.get(signature);
+    }
 }
