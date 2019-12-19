@@ -3,7 +3,6 @@
  * @summary TestTenantException
  * @library /lib/testlibrary
  * @run main/othervm  -XX:+MultiTenant -XX:+TenantDataIsolation -XX:+TenantThreadStop -XX:+UseG1GC -XX:+EnableCoroutine -XX:+UseWispMonitor -Dcom.alibaba.wisp.transparentWispSwitch=true TestTenantException
- * @run main/othervm  -XX:+MultiTenant -XX:+TenantDataIsolation -XX:+TenantThreadStop -XX:+UseG1GC -XX:+EnableCoroutine -XX:+UseWispMonitor -Dcom.alibaba.wisp.transparentWispSwitch=true -Dcom.alibaba.wisp.version=2 TestTenantException
 */
 
 import com.alibaba.tenant.TenantDeathException;

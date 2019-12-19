@@ -2,7 +2,6 @@
  * @test
  * @summary Test WispEngine's Socket
  * @run main/othervm -XX:+EnableCoroutine -Dcom.alibaba.wisp.transparentWispSwitch=true TestSocket
- * @run main/othervm -XX:+EnableCoroutine -Dcom.alibaba.wisp.transparentWispSwitch=true -Dcom.alibaba.wisp.version=2 TestSocket
 */
 
 import java.io.IOException;

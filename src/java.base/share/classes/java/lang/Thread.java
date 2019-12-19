@@ -312,7 +312,6 @@ class Thread implements Runnable {
         try {
             if (coroutineSupport != null) {
                 if (WEA != null) {
-                    WEA.eventLoop();
                     WEA.destroy();
                 }
                 coroutineSupport.drain();
@@ -1754,7 +1753,7 @@ class Thread implements Runnable {
                 boolean isCurrentTask = WEA.getCurrentTask() == task;
                 slowPath = !isCurrentTask;
                 if (!WEA.isThreadTask(task) && !isCurrentTask) {
-                    return task.getStackTrace();
+                    return WEA.getStackTrace(task);
                 }
             }
         } else {
