@@ -417,7 +417,8 @@ InstanceKlass::InstanceKlass(const ClassFileParser& parser, unsigned kind, Klass
   _reference_type(parser.reference_type()),
   _nest_members(NULL),
   _nest_host_index(0),
-  _nest_host(NULL) {
+  _nest_host(NULL),
+  _source_file_path(NULL) {
     set_vtable_length(parser.vtable_size());
     set_kind(kind);
     set_access_flags(parser.access_flags());

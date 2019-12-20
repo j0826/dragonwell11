@@ -710,11 +710,13 @@ struct SharedMiscInfo {
   Klass* _klass;
   int _clsfile_size;
   int _clsfile_crc32;
+  int _defining_loader_hash;
+  int _initiating_loader_hash;
 };
 
 static GrowableArray<SharedMiscInfo>* misc_info_array = NULL;
 
-void SystemDictionaryShared::set_shared_class_misc_info(Klass* k, ClassFileStream* cfs) {
+void SystemDictionaryShared::set_shared_class_misc_info(Klass* k, ClassFileStream* cfs, int defining_loader_hash, int initiating_loader_hash) {
   assert(DumpSharedSpaces, "only when dumping");
   int clsfile_size  = cfs->length();
   int clsfile_crc32 = ClassLoader::crc32(0, (const char*)cfs->buffer(), cfs->length());
@@ -734,6 +736,8 @@ void SystemDictionaryShared::set_shared_class_misc_info(Klass* k, ClassFileStrea
   misc_info._klass = k;
   misc_info._clsfile_size = clsfile_size;
   misc_info._clsfile_crc32 = clsfile_crc32;
+  misc_info._defining_loader_hash = defining_loader_hash;
+  misc_info._initiating_loader_hash = initiating_loader_hash;
 
   misc_info_array->append(misc_info);
 }
@@ -745,6 +749,8 @@ void SystemDictionaryShared::init_shared_dictionary_entry(Klass* k, DictionaryEn
   entry->_clsfile_crc32 = -1;
   entry->_verifier_constraints = NULL;
   entry->_verifier_constraint_flags = NULL;
+  entry->_defining_loader_hash = 0;
+  entry->_initiating_loader_hash = 0;
 
   if (misc_info_array != NULL) {
     for (int i=0; i<misc_info_array->length(); i++) {
@@ -752,6 +758,8 @@ void SystemDictionaryShared::init_shared_dictionary_entry(Klass* k, DictionaryEn
       if (misc_info._klass == k) {
         entry->_clsfile_size = misc_info._clsfile_size;
         entry->_clsfile_crc32 = misc_info._clsfile_crc32;
+        entry->_defining_loader_hash = misc_info._defining_loader_hash;
+        entry->_initiating_loader_hash = misc_info._initiating_loader_hash;
         misc_info_array->remove_at(i);
         return;
       }

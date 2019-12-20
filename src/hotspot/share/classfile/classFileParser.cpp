@@ -5514,6 +5514,11 @@ InstanceKlass* ClassFileParser::create_instance_klass(bool changed_by_loadhook, 
   return ik;
 }
 
+void ClassFileParser::set_class_source(InstanceKlass* ik, TRAPS) {
+  const char* path = _stream->source();
+  ik->set_source_file_path(path ? SymbolTable::new_symbol(path, THREAD) : NULL);
+}
+
 void ClassFileParser::fill_instance_klass(InstanceKlass* ik, bool changed_by_loadhook, TRAPS) {
   assert(ik != NULL, "invariant");
 
@@ -5588,6 +5593,10 @@ void ClassFileParser::fill_instance_klass(InstanceKlass* ik, bool changed_by_loa
   ik->set_major_version(_major_version);
   ik->set_has_nonstatic_concrete_methods(_has_nonstatic_concrete_methods);
   ik->set_declares_nonstatic_concrete_methods(_declares_nonstatic_concrete_methods);
+
+  if (EagerAppCDS) {
+    set_class_source(ik, THREAD);
+  }
 
   if (_host_klass != NULL) {
     assert (ik->is_anonymous(), "should be the same");
@@ -5778,8 +5787,10 @@ void ClassFileParser::log_loaded_klass(InstanceKlass* ik, const ClassFileStream 
   const char *name = ik->name()->as_C_string();
   bool is_builtin = loader_data->is_builtin_class_loader_data();
 
-  if (is_builtin && !should_skip_class(loader_data, stream)) {
-    classlist_file->print("%s klass: " INTPTR_FORMAT, name, p2i(ik));
+  if (is_builtin) {
+    if(!should_skip_class(loader_data, stream)) {
+      classlist_file->print("%s klass: " INTPTR_FORMAT, name, p2i(ik));
+    }
   } else {
     if (SystemDictionary::should_not_dump_class(ik)) {
       return;
@@ -6084,15 +6095,20 @@ void ClassFileParser::parse_stream(const ClassFileStream* const stream,
   _major_version = stream->get_u2_fast();
 
   if (DumpSharedSpaces && _major_version < JAVA_6_VERSION) {
-    ResourceMark rm;
-    warning("Pre JDK 6 class not supported by CDS: %u.%u %s",
-            _major_version,  _minor_version, _class_name->as_C_string());
-    Exceptions::fthrow(
-      THREAD_AND_LOCATION,
-      vmSymbols::java_lang_UnsupportedClassVersionError(),
-      "Unsupported major.minor version for dump time %u.%u",
-      _major_version,
-      _minor_version);
+    if (EagerAppCDSLegacyVerisonSupport) {
+      log_trace(class, eagerappcds)("dump the pre JDK6 class: %s",
+                _class_name->as_C_string());
+    } else {
+      ResourceMark rm;
+      warning("Pre JDK 6 class not supported by CDS: %u.%u %s",
+              _major_version,  _minor_version, _class_name->as_C_string());
+      Exceptions::fthrow(
+        THREAD_AND_LOCATION,
+        vmSymbols::java_lang_UnsupportedClassVersionError(),
+        "Unsupported major.minor version for dump time %u.%u",
+        _major_version,
+        _minor_version);
+    }
   }
 
   // Check version numbers - we check this even with verifier off

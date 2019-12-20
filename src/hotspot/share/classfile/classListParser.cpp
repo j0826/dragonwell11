@@ -86,6 +86,10 @@ bool ClassListParser::parse_one_line() {
   _interfaces->clear();
   _source = NULL;
   _interfaces_specified = false;
+  _defining_loader_hash = _unspecified;
+  _initiating_loader_hash = _unspecified;
+  _fingerprint = 0;
+  _dependence_not_loaded = 0;
 
   {
     int len = (int)strlen(_line);
@@ -124,12 +128,18 @@ bool ClassListParser::parse_one_line() {
     if (parse_int_option("id:", &_id)) {
       continue;
     } else if (parse_int_option("super:", &_super)) {
-      check_already_loaded("Super class", _super);
+      // fingerprint check failure causes that the super class isn't loaded.
+      if (!check_already_loaded("Super class", _super)) {
+        return true;
+      }
       continue;
     } else if (skip_token("interfaces:")) {
       int i;
       while (try_parse_int(&i)) {
-        check_already_loaded("Interface", i);
+        // fingerprint check failure causes that the interface isn't loaded.
+        if (!check_already_loaded("Interface", i)) {
+          return true;
+        }
         _interfaces->append(i);
       }
     } else if (skip_token("source:")) {
@@ -142,6 +152,12 @@ bool ClassListParser::parse_one_line() {
         *s = '\0'; // mark the end of _source
         _token = s+1;
       }
+    } else if (EagerAppCDS && parse_hex_option("defining_loader_hash:", &_defining_loader_hash)) {
+      continue;
+    } else if (EagerAppCDS && parse_hex_option("initiating_loader_hash:", &_initiating_loader_hash)) {
+      continue;
+    } else if (EagerAppCDS && parse_uint64_option("fingerprint:", &_fingerprint)) {
+      continue;
     } else {
       error("Unknown input");
     }
@@ -210,6 +226,35 @@ bool ClassListParser::parse_int_option(const char* option_name, int* value) {
     }
   }
   return false;
+}
+
+bool ClassListParser::parse_hex_option(const char* option_name, int* value) {
+  if (skip_token(option_name)) {
+    if (*value != _unspecified) {
+      error("%s specified twice", option_name);
+    }
+    skip_whitespaces();
+    if (sscanf(_token, "%x", value) == 1) {
+      skip_non_whitespaces();
+      return true;
+    } else {
+      error("Error: expected hex");
+      return false;
+    }
+  }
+  return false;
+}
+
+bool ClassListParser::parse_uint64_option(const char* option_name, uint64_t* value) {
+  if (!skip_token(option_name)) return false;
+  skip_whitespaces();
+  if (sscanf(_token, PTR64_FORMAT, value) == 1) {
+    skip_non_whitespaces();
+    return true;
+  } else {
+    error("Error: expected hex");
+    return false;
+  }
 }
 
 void ClassListParser::print_specified_interfaces() {
@@ -288,7 +333,6 @@ InstanceKlass* ClassListParser::load_class_from_source(Symbol* class_name, TRAPS
   if (!is_id_specified()) {
     error("If source location is specified, id must be also specified");
   }
-  InstanceKlass* k = ClassLoaderExt::load_class(class_name, _source, THREAD);
 
   if (strncmp(_class_name, "java/", 5) == 0) {
     log_info(cds)("Prohibited package for non-bootstrap classes: %s.class from %s",
@@ -296,6 +340,11 @@ InstanceKlass* ClassListParser::load_class_from_source(Symbol* class_name, TRAPS
     return NULL;
   }
 
+  InstanceKlass* k = ClassLoaderExt::load_class(class_name, _source,
+                                                _defining_loader_hash == _unspecified ? 0 : _defining_loader_hash,
+                                                _initiating_loader_hash == _unspecified ? 0 : _initiating_loader_hash,
+                                                _fingerprint,
+                                                THREAD);
   if (k != NULL) {
     if (k->local_interfaces()->length() != _interfaces->length()) {
       print_specified_interfaces();

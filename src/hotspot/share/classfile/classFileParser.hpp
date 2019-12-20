@@ -177,6 +177,7 @@ class ClassFileParser {
   void fix_anonymous_class_name(TRAPS);
 
   void fill_instance_klass(InstanceKlass* ik, bool cf_changed_in_CFLH, TRAPS);
+  void set_class_source(InstanceKlass* ik, TRAPS);
   void set_klass(InstanceKlass* instance);
 
   void set_class_bad_constant_seen(short bad_constant);

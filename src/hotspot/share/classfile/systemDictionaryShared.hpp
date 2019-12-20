@@ -127,6 +127,8 @@ public:
   int             _id;
   int             _clsfile_size;
   int             _clsfile_crc32;
+  int             _defining_loader_hash;
+  int             _initiating_loader_hash;
   void*           _verifier_constraints; // FIXME - use a union here to avoid type casting??
   void*           _verifier_constraint_flags;
 
@@ -351,7 +353,7 @@ public:
     ((SharedDictionary*)(klass->class_loader_data()->dictionary()))->update_entry(klass, id);
   }
 
-  static void set_shared_class_misc_info(Klass* k, ClassFileStream* cfs);
+  static void set_shared_class_misc_info(Klass* k, ClassFileStream* cfs, int defining_loader_hash, int initiating_loader_hash);
 
   static InstanceKlass* lookup_from_stream(const Symbol* class_name,
                                            Handle class_loader,

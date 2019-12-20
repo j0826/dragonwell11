@@ -1745,6 +1745,10 @@ int MetaspaceShared::preload_classes(const char* class_list_path, TRAPS) {
   int class_count = 0;
 
     while (parser.parse_one_line()) {
+      // fingerprint check failure causes the dependent class isn't loaded
+      if (parser.dependence_not_loaded()) {
+        continue;
+      }
       Klass* klass = ClassLoaderExt::load_one_class(&parser, THREAD);
       if (HAS_PENDING_EXCEPTION) {
         if (klass == NULL &&
