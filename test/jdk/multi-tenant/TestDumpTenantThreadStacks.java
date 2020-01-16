@@ -8,12 +8,18 @@
 
 import com.alibaba.tenant.TenantConfiguration;
 import com.alibaba.tenant.TenantContainer;
+import com.alibaba.tenant.TenantException;
 import com.alibaba.wisp.engine.WispEngine;
 import jdk.test.lib.process.OutputAnalyzer;
 import jdk.test.lib.process.ProcessTools;
+
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.concurrent.CountDownLatch;
+import java.util.Set;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicReference;
+
 import static jdk.test.lib.Asserts.*;
 
 // TODO: enable Wisp code
@@ -56,18 +62,18 @@ public class TestDumpTenantThreadStacks {
                 // basic testing with coroutine
                 new String[] {
                         "-XX:+MultiTenant",
+                        "-Dcom.alibaba.wisp.transparentWispSwitch=true",
                         "-XX:+EnableCoroutine",
                         // to allow reflection access to com.alibaba.tenant
                         "--illegal-access=permit",
                         "--add-opens",
                         "java.base/com.alibaba.tenant=ALL-UNNAMED",
+                        "--add-opens",
+                        "java.base/com.alibaba.wisp.engine=ALL-UNNAMED",
                         "-D" + WISP_ENABLED_PROP + "=true",
                         Observed.class.getName()
                 },
                 new String[] {
-                        "Observed-0",
-                        "Observed-" + (TEST_PARALLELISM - 1),
-                        "at " + Observed.class.getName() + ".foo",
                         "at " + Observed.class.getName() + ".blocker",
                         "- Coroutine",
                         "waiting on condition"
@@ -121,15 +127,14 @@ public class TestDumpTenantThreadStacks {
                         "-Dcom.alibaba.tenant.ShutdownSTWSoftLimit=1000",
                         "-Dcom.alibaba.tenant.PrintStacksOnTimeoutDelay=500",
                         "-Dcom.alibaba.tenant.DebugTenantShutdown=true",
+                        "-Dcom.alibaba.wisp.transparentWispSwitch=true",
                         "-XX:+EnableCoroutine",
                         "-D" + WISP_ENABLED_PROP + "=true",
-                        TenantDieHard.class.getName()
+                        WispDieHard.class.getName()
                 },
                 new String[] {
-                        "TenantDieHardThread-0",
-                        "TenantDieHardThread-" + (TEST_PARALLELISM - 1),
-                        "at " + TenantDieHard.class.getName() + ".bar",
-                        "- Coroutine",
+                        "at " + WispDieHard.class.getName() + ".bar",
+                        "at " + TestDumpTenantThreadStacks.class.getName() + ".block",
                         "waiting on condition"
                 }
         };
@@ -173,16 +178,18 @@ public class TestDumpTenantThreadStacks {
 
             workersReady.await();
 
-            dumpThreads(threads);
+            if (WISP_ENABLED) {
+                dumpWispCarrierThreads();
+            } else {
+                dumpThreads(threads);
+            }
         }
 
         // fabricate a stack
 
         private static void foo(Runnable r) {
             if (WISP_ENABLED) {
-                for (int i = 0; i < 10; ++i) {
-                    WispEngine.dispatch(Observed::blocker);
-                }
+                WispEngine.dispatch(r);
             } else {
                 r.run();
             }
@@ -198,10 +205,6 @@ public class TestDumpTenantThreadStacks {
 
     // Test for the scenario that failed to kill threads
     private static class TenantDieHard {
-
-        private static final boolean WISP_ENABLED = Boolean.parseBoolean(
-                System.getProperty(WISP_ENABLED_PROP, "false"));
-
         private static CountDownLatch workersReady = new CountDownLatch(TEST_PARALLELISM);
 
         public static void main(String[] args) throws Exception {
@@ -239,11 +242,48 @@ public class TestDumpTenantThreadStacks {
                 workersReady.countDown();
                 blockThread(-1);
             };
-            if (WISP_ENABLED) {
-                WispEngine.dispatch(r);
-            } else {
-                r.run();
-            }
+            r.run();
+        }
+    }
+
+    private static class WispDieHard {
+        private static CountDownLatch workersReady = new CountDownLatch(1);
+
+        public static void main(String[] args) throws Exception {
+            TenantContainer tenant = TenantContainer.create(new TenantConfiguration());
+
+            ExecutorService executors = Executors.newFixedThreadPool(1, r -> {
+                Thread[] threads = new Thread[1];
+                try {
+                    tenant.run(() -> {
+                        threads[0] = new Thread(r);
+                        threads[0].setDaemon(true);
+                    });
+                } catch (TenantException e) {
+                    e.printStackTrace();
+                    fail();
+                }
+                return threads[0];
+            }) ;
+
+            executors.execute(WispDieHard::bar);
+
+            workersReady.await();
+
+            tenant.destroy();
+            long waitForDumpDelay = Math.max(
+                    Long.parseLong(System.getProperty("com.alibaba.tenant.ShutdownSTWSoftLimit")),
+                    Long.parseLong(System.getProperty("com.alibaba.tenant.PrintStacksOnTimeoutDelay"))) << 1;
+            // wait for thread dump to happen
+            System.out.println("# wait for " + waitForDumpDelay + "ms");
+            blockThread(waitForDumpDelay);
+        }
+
+        private static void bar() {
+            // masked without unmask, so TenantContainer.destroy() will never kill this thread
+            TenantContainer.maskTenantShutdown();
+            workersReady.countDown();
+            blockThread(-1);
         }
     }
 
@@ -254,6 +294,20 @@ public class TestDumpTenantThreadStacks {
             m.setAccessible(true);
             m.invoke(null, new Object[] { threads } );
         } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+            fail();
+        }
+    }
+
+    // dump all wisp carrier thread
+    private static void dumpWispCarrierThreads() {
+        try {
+            Field f = WispEngine.class.getDeclaredField("carrierThreads");
+            f.setAccessible(true);
+            Set<Thread> carrierSet = (Set)f.get(null);
+            Thread[] threads = carrierSet.toArray(Thread[]::new);
+            dumpThreads(threads);
+        } catch (Exception e) {
+            e.printStackTrace();
             fail();
         }
     }
