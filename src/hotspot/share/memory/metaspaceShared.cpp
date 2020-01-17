@@ -462,6 +462,11 @@ void MetaspaceShared::serialize_well_known_classes(SerializeClosure* soc) {
   java_lang_LiveStackFrameInfo::serialize(soc);
   java_util_concurrent_locks_AbstractOwnableSynchronizer::serialize(soc);
   jdk_internal_module_ArchivedModuleGraph::serialize(soc);
+  if (EnableCoroutine) {
+    java_dyn_CoroutineBase::serialize(soc);
+    com_alibaba_wisp_engine_WispEngine::serialize(soc);
+    com_alibaba_wisp_engine_WispTask::serialize(soc);
+  }
 }
 
 address MetaspaceShared::cds_i2i_entry_code_buffers(size_t total_size) {

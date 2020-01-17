@@ -1583,6 +1583,8 @@ public:
 
   static int get_data_offset()    { return _data_offset; }
 
+  static void serialize(SerializeClosure* f) NOT_CDS_RETURN;
+
   // Debugging
   friend class JavaClasses;
 };
@@ -1594,6 +1596,7 @@ public:
   static bool in_critical(oop obj);
 
   static void compute_offsets();
+  static void serialize(SerializeClosure* f) NOT_CDS_RETURN;
 };
 
 class com_alibaba_wisp_engine_WispTask: AllStatic {
@@ -1622,6 +1625,7 @@ public:
   static void set_preemptCount(oop obj, jint count);
 
   static void compute_offsets();
+  static void serialize(SerializeClosure* f) NOT_CDS_RETURN;
 };
 
 // Interface to hard-coded offset checking
