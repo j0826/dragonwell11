@@ -198,6 +198,9 @@ bool SystemDictionary::is_platform_class_loader(oop class_loader) {
 Klass* SystemDictionary::resolve_or_fail(Symbol* class_name, Handle class_loader, Handle protection_domain, bool throw_error, TRAPS) {
   Klass* klass = resolve_or_null(class_name, class_loader, protection_domain, THREAD);
   if (HAS_PENDING_EXCEPTION || klass == NULL) {
+    if (NotFoundClassOpt) {
+      SystemDictionaryShared::log_not_found_klass(class_name, class_loader, THREAD);
+    }
     // can return a null klass
     klass = handle_resolution_exception(class_name, throw_error, klass, THREAD);
   }
@@ -1468,6 +1471,11 @@ void SystemDictionary::dump_class_and_loader_relationship(InstanceKlass* k, Clas
 }
 #endif // INCLUDE_CDS
 
+bool SystemDictionary::invalid_class_name_for_EagerAppCDS(const char* name) {
+  // ignore the class which is dynamically generated.
+  return strstr(name, DOUBLE_DOLLAR_STR) != NULL;
+}
+
 InstanceKlass* SystemDictionary::load_instance_class(Symbol* class_name, Handle class_loader, TRAPS) {
 
   if (class_loader.is_null()) {
@@ -1571,10 +1579,13 @@ InstanceKlass* SystemDictionary::load_instance_class(Symbol* class_name, Handle 
       char* name = class_name->as_C_string();
       // Only boot and platform class loaders can define classes in "java/" packages
       // in EagerAppCDS, ignore the classes in "java/" packages
-      if (!(strncmp(name, JAVAPKG, JAVAPKG_LEN) == 0 && name[JAVAPKG_LEN] == '/')) {
-        InstanceKlass *k = SystemDictionaryShared::lookup_shared(class_name, class_loader, CHECK_NULL);
+      if (!(strncmp(name, JAVAPKG, JAVAPKG_LEN) == 0 && name[JAVAPKG_LEN] == '/') && !invalid_class_name_for_EagerAppCDS(name)) {
+        bool not_found = false;
+        InstanceKlass *k = SystemDictionaryShared::lookup_shared(class_name, class_loader, not_found, CHECK_NULL);
         if (k) {
           return k;
+        } else if (not_found) {
+          return NULL;
         }
       }
     }

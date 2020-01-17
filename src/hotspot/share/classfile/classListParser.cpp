@@ -354,7 +354,8 @@ InstanceKlass* ClassListParser::load_class_from_source(Symbol* class_name, TRAPS
     }
 
     if (!SystemDictionaryShared::add_non_builtin_klass(class_name, ClassLoaderData::the_null_class_loader_data(),
-                                                       k, THREAD)) {
+                                                       k, _initiating_loader_hash == _unspecified ? 0 : _initiating_loader_hash,
+                                                       THREAD)) {
       error("Duplicated class %s", _class_name);
     }
 
@@ -431,7 +432,11 @@ Klass* ClassListParser::load_current_class(TRAPS) {
   } else {
     // If "source:" tag is specified, all super class and super interfaces must be specified in the
     // class list file.
-    klass = load_class_from_source(class_name_symbol, CHECK_NULL);
+    if (NotFoundClassOpt && strstr(_source, NOT_FOUND_CLASS)) {
+      return NULL;
+    } else {
+      klass = load_class_from_source(class_name_symbol, CHECK_NULL);
+    }
   }
 
   if (klass != NULL && klass->is_instance_klass() && is_id_specified()) {

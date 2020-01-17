@@ -81,6 +81,9 @@
   product(bool, EagerAppCDS, false,                                         \
           "aggressively skip over loadClass() to speed up boot time")       \
                                                                             \
+  product(bool, NotFoundClassOpt, false,                                    \
+          "optimization for not found class in EagerAppCDS flow")           \
+                                                                            \
   experimental(bool, EagerAppCDSLegacyVerisonSupport, false,                \
           "dump the classes which is compiled JDK1.5 or below")             \
   //add new AJDK specific flags here

@@ -1,6 +1,6 @@
 /*
  * @test
- * @summary Test EagerAppCDS Flow with wisp
+ * @summary Test dumping with not found class
  * @library /lib/testlibrary /test/lib
  * @modules java.base/jdk.internal.misc
  *          java.management
@@ -9,9 +9,9 @@
  * @modules java.base/com.alibaba.util:+open
  * @build Classes4CDS
  * @build TestSimple
- * @build TestClassLoaderWithSignature
- * @run driver ClassFileInstaller -jar test.jar TestClassLoaderWithSignature
- * @run main/othervm -XX:+UnlockExperimentalVMOptions TestDumpAndLoadClassWithWisp
+ * @build TestLoaderInexistentClass
+ * @run driver ClassFileInstaller -jar test.jar TestLoaderInexistentClass
+ * @run main/othervm -XX:+UnlockExperimentalVMOptions TestDumpAndLoadNotFound
  */
 
 import jdk.test.lib.cds.CDSTestUtils;
@@ -22,15 +22,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.io.*;
 
-public class TestDumpAndLoadClassWithWisp {
+public class TestDumpAndLoadNotFound {
 
     private static final String TESTJAR = "./test.jar";
-    private static final String TESTNAME = "TestClassLoaderWithSignature";
+    private static final String TESTNAME = "TestLoaderInexistentClass";
     private static final String TESTCLASS = TESTNAME + ".class";
 
-    private static final String CLASSLIST_FILE = "./TestDumpAndLoadClassWithWisp.classlist";
-    private static final String CLASSLIST_FILE_2 = "./TestDumpAndLoadClassWithWisp.classlist2";
-    private static final String ARCHIVE_FILE = "./TestDumpAndLoadClassWithWisp.jsa";
+    private static final String CLASSLIST_FILE = "./TestDumpAndLoadNotFound.classlist";
+    private static final String CLASSLIST_FILE_2 = "./TestDumpAndLoadNotFound.classlist2";
+    private static final String ARCHIVE_FILE = "./TestDumpAndLoadNotFound.jsa";
     private static final String BOOTCLASS = "java.lang.Class";
     private static final String TEST_CLASS = System.getProperty("test.classes");
 
@@ -69,7 +69,6 @@ public class TestDumpAndLoadClassWithWisp {
             // trigger JVMCI runtime init so that JVMCI classes will be
             // included in the classlist
             "-XX:+EagerAppCDS",
-            "-XX:+UseWisp2",
             "-cp",
             TESTJAR,
             TESTNAME);
@@ -121,7 +120,6 @@ public class TestDumpAndLoadClassWithWisp {
             "-XX:+EagerAppCDS",
             "-XX:SharedClassListFile=" + CLASSLIST_FILE_2,
             "-XX:SharedArchiveFile=" + ARCHIVE_FILE,
-            "-XX:+EnableCoroutine",
             "-Xlog:class+eagerappcds=trace",
             "-Xshare:dump",
             "-XX:MetaspaceSize=12M",
@@ -142,17 +140,18 @@ public class TestDumpAndLoadClassWithWisp {
         ProcessBuilder pb = ProcessTools.createJavaProcessBuilder(true,
             "-Dtest.classes=" + TEST_CLASS,
             "-XX:+EagerAppCDS",
+            "-Dcom.alibaba.cds.listPath=" + CLASSLIST_FILE_2,
             "-Xshare:on",
             "-XX:SharedArchiveFile=" + ARCHIVE_FILE,
             "-Xlog:class+eagerappcds=trace",
-            "-XX:+UseWisp2",
             "-cp",
             TESTJAR,
             TESTNAME);
 
         OutputAnalyzer output = CDSTestUtils.executeAndLog(pb, "start-with-shared-archive")
             .shouldHaveExitValue(0);
-        output.shouldNotContain("[CDS load class Failed");
+        output.shouldNotContain("[CDS load class Failed").shouldContain("[CDS load class] Not found class")
+              .shouldContain("[CDS load class] Successful loading of class");
     }
 
 }

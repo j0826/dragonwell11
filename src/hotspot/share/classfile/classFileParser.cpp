@@ -5798,14 +5798,9 @@ void ClassFileParser::log_loaded_klass(InstanceKlass* ik, const ClassFileStream 
       return;
     }
 
-    int hash = java_lang_ClassLoader::signature(loader_data->class_loader());
-    if (hash == 0) {
-      // if this classloader hasn't been registered as cds loader, we won't dump it.
-      return;
-    }
-    // sample:
     // TestSimple source: file:/tmp/classes/com/alibaba/cds/TestDumpAndLoadClass.d/ klass: 0x0000000800066840
     // super: 0x0000000800001000 defining_loader_hash: fa474cbf fingerprint: 0x00000199e3c89ea7
+    // If the signature is 0, still dump the class loading information for AppCDS usage
     MutexLocker mu(DumpLoadedClassList_lock, THREAD);
     classlist_file->print("%s source: %s klass: " INTPTR_FORMAT, name, stream->source(), p2i(ik));
     classlist_file->print(" super: " INTPTR_FORMAT, p2i(ik->superklass()));
@@ -5819,7 +5814,11 @@ void ClassFileParser::log_loaded_klass(InstanceKlass* ik, const ClassFileStream 
                               p2i(InstanceKlass::cast(intf->at(i))));
       }
     }
-    classlist_file->print(" defining_loader_hash: %x", hash);
+
+    int hash = java_lang_ClassLoader::signature(loader_data->class_loader());
+    if (hash != 0) {
+        classlist_file->print(" defining_loader_hash: %x", hash);
+    }
     classlist_file->print(" fingerprint: " PTR64_FORMAT, stream->compute_fingerprint());
   }
   classlist_file->cr();

@@ -1,7 +1,9 @@
 import java.io.*;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class Classes4CDS {
     BufferedReader in;
@@ -69,6 +71,18 @@ public class Classes4CDS {
             this.initiatingHash = null;
             this.fingerprint = fingerprint;
         }
+
+        public CDSData(String name, String sourcePath, String initiatingHash) {
+            className = name;
+            this.id = null;
+            this.superId = null;
+            interfaceIds = null;
+            source = sourcePath;
+            this.definingHash = null;
+            this.initiatingHash = initiatingHash;
+            this.fingerprint = null;
+        }
+
     }
 
     private String getKlassName(String line) {
@@ -186,7 +200,7 @@ public class Classes4CDS {
                 out.print("super: " + data.superId);
                 out.print(" ");
             }
-            if (data.interfaceIds.size() != 0) {
+            if (data.interfaceIds != null && data.interfaceIds.size() != 0) {
                 out.print("interfaces: ");
                 for (String s : data.interfaceIds) {
                     out.print(s);
@@ -228,9 +242,40 @@ public class Classes4CDS {
         }
     }
 
+    private boolean invalidCheck(CDSData data) {
+        if (data.source == null) {
+            return false;
+        }
+        // appCDS
+        if (data.definingHash == null) {
+            if (eagerCDSSet.contains(data.className)) {
+                return true;
+            } else {
+                appCDSSet.add(data.className);
+            }
+        } else {
+            //eagerAppCDS
+            if (data.initiatingHash == null) {
+                return true;
+            } else {
+                if (appCDSSet.contains(data.className)) {
+                    return true;
+                } else {
+                    eagerCDSSet.add(data.className);
+                }
+            }
+        }
+        return false;
+    }
+
     HashMap<String, String> idIds = new HashMap<String, String>();
-    HashMap<String, CDSData> nameCDSData = new HashMap<String, CDSData>();
+    HashMap<String, CDSData> nameidCDSData = new HashMap<String, CDSData>();
+    HashMap<String, CDSData> notFoundCDSData = new HashMap<String, CDSData>();
+    Set<String> eagerCDSSet = new HashSet<>();
+    Set<String> appCDSSet = new HashSet<>();
+
     List<CDSData> all = new ArrayList<CDSData>();
+    List<CDSData> allnotfound = new ArrayList<CDSData>();
 
     void run() {
         try {
@@ -241,10 +286,16 @@ public class Classes4CDS {
                     String id = getId(line);
                     String definingHash = getDefiningLoaderHash(line);
                     String initiatingHash = getInitiatingLoaderHash(line);
-                    CDSData oldData = nameCDSData.get(name + id + definingHash);
+                    CDSData oldData = nameidCDSData.get(name + id + definingHash);
                     if (oldData.initiatingHash == null) {
                         oldData.initiatingHash = initiatingHash;
                     }
+                } else if (line.contains("source: not.found.class")) {
+                    String name = getKlassName(line);
+                    String source = getKlassPath(line);
+                    String initiatingHash = getInitiatingLoaderHash(line);
+                    CDSData newData = new CDSData(name, source, initiatingHash);
+                    allnotfound.add(newData);
                 } else {
                     String name = getKlassName(line);
                     String id = getId(line);
@@ -255,7 +306,7 @@ public class Classes4CDS {
                     String fingerprint = getFingerprint(line);
                     CDSData newData = new CDSData(name, id, superId, iids, source, definingHash, fingerprint);
                     all.add(newData);
-                    nameCDSData.put(name + id + definingHash, newData);
+                    nameidCDSData.put(name + id + definingHash, newData);
                 }
                 line = in.readLine();
                 if (line == null) {
@@ -270,7 +321,8 @@ public class Classes4CDS {
 
         // Now replace Id with incremental numbers
         // First should be java/lang/Object
-        System.out.println("Total: " + all.size());
+        System.out.println("Total class load: " + all.size());
+        int klassID = 1;
         CDSData data = all.get(0);
         if (!data.className.equals("java/lang/Object")) {
             System.out.println("First should be java/lang/Object!");
@@ -279,7 +331,7 @@ public class Classes4CDS {
         }
         data.superId = null;
         idIds.put(data.id, "1");
-        data.id = "1";
+        data.id = String.valueOf(klassID);
         try {
             decodeSource(data);
         } catch (Exception e) {
@@ -291,7 +343,10 @@ public class Classes4CDS {
         printCDSData(data);
         for (int i = 1; i < all.size(); i++) {
             data = all.get(i);
-            String newId = String.valueOf(i + 1);
+            if (invalidCheck(data)) {
+                continue;
+            }
+            String newId = String.valueOf(++klassID);
             idIds.put(data.id, newId);
             data.id = newId;
             String sp = idIds.get(data.superId);
@@ -312,6 +367,16 @@ public class Classes4CDS {
                 status = false;
                 return;
             }
+            printCDSData(data);
+        }
+        for (int i = 0; i < allnotfound.size(); i++) {
+            data = allnotfound.get(i);
+            String name = data.className;
+            if (appCDSSet.contains(name)) {
+                continue;
+            }
+            String newId = String.valueOf(++klassID);
+            data.id = newId;
             printCDSData(data);
         }
     }

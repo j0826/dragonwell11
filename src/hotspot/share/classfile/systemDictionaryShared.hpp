@@ -105,6 +105,7 @@
 
 ===============================================================================*/
 #define UNREGISTERED_INDEX -9999
+#define NOT_FOUND_CLASS "not.found.class"
 
 class ClassFileStream;
 
@@ -183,7 +184,8 @@ public:
 
   bool add_non_builtin_klass(const Symbol* class_name,
                              ClassLoaderData* loader_data,
-                             InstanceKlass* obj);
+                             InstanceKlass* obj,
+                             int initiating_loader_hash);
 
   void update_entry(Klass* klass, int id);
 
@@ -269,6 +271,7 @@ private:
     // result is used by all threads, and all future queries.
     array->atomic_compare_exchange_oop(index, o, NULL);
   }
+  static bool check_class_not_found(const Symbol *class_name, int hash_value, TRAPS);
   static InstanceKlass* load_class_from_cds(const Symbol* class_name, Handle class_loader, InstanceKlass* ik, int hash, TRAPS);
 
   static oop shared_protection_domain(int index);
@@ -324,7 +327,7 @@ public:
   }
 
   static bool add_non_builtin_klass(Symbol* class_name, ClassLoaderData* loader_data,
-                                    InstanceKlass* k, TRAPS);
+                                    InstanceKlass* k, int initiating_loader_hash, TRAPS);
   static Klass* dump_time_resolve_super_or_fail(Symbol* child_name,
                                                 Symbol* class_name,
                                                 Handle class_loader,
@@ -361,14 +364,16 @@ public:
 
   static void set_shared_class_misc_info(Klass* k, ClassFileStream* cfs, int defining_loader_hash, int initiating_loader_hash);
 
+  static void log_not_found_klass(Symbol* name, Handle class_loader, TRAPS);
+
   static InstanceKlass* lookup_from_stream(const Symbol* class_name,
                                            Handle class_loader,
                                            Handle protection_domain,
                                            const ClassFileStream* st,
                                            TRAPS);
 
-  static InstanceKlass* lookup_shared(const Symbol* class_name,
-                                      Handle class_loader, TRAPS);
+  static InstanceKlass* lookup_shared(const Symbol* class_name, Handle class_loader,
+                                      bool& not_found, TRAPS);
 
   static InstanceKlass* define_class_from_cds(InstanceKlass *ik,
                                               Handle class_loader,

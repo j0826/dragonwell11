@@ -749,6 +749,7 @@ protected:
   // table of box klasses (int_klass, etc.)
   static InstanceKlass* _box_klasses[T_VOID+1];
 
+  static bool invalid_class_name_for_EagerAppCDS(const char* name);
 private:
   static oop  _java_system_loader;
   static oop  _java_platform_loader;
@@ -759,4 +760,5 @@ public:
   static void system_dict_lock_change(TRAPS);
 };
 
+#define DOUBLE_DOLLAR_STR "$$"
 #endif // SHARE_VM_CLASSFILE_SYSTEMDICTIONARY_HPP

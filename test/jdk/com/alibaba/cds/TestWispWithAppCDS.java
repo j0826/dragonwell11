@@ -93,7 +93,7 @@ public class TestWispWithAppCDS {
             TESTJAR,
             "-XX:SharedClassListFile=" + CLASSLIST_FILE_2,
             "-XX:SharedArchiveFile=" + ARCHIVE_FILE,
-            "-XX:+UseWisp2",
+            "-XX:+EnableCoroutine",
             "-XX:+EagerAppCDS",
             "-XX:ActiveProcessorCount=4",
             "-Xlog:class+eagerappcds=trace",
