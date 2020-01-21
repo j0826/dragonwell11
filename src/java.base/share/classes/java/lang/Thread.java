@@ -280,9 +280,6 @@ class Thread implements Runnable {
      */
     private CoroutineSupport coroutineSupport;
 
-
-    WispEngine wispEngine;
-
     WispTask wispTask;
 
     volatile boolean wispIsAlive;
