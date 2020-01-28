@@ -301,6 +301,9 @@ public:
                                                Handle class_loader,
                                                TRAPS);
 
+  static InstanceKlass* load_shared_class_for_registerd_loader(Symbol* class_name,
+                                               Handle class_loader,
+                                               TRAPS);
 
   static void allocate_shared_data_arrays(int size, TRAPS);
   static void oops_do(OopClosure* f);
@@ -373,7 +376,7 @@ public:
                                            TRAPS);
 
   static InstanceKlass* lookup_shared(const Symbol* class_name, Handle class_loader,
-                                      bool& not_found, TRAPS);
+                                      bool& not_found, bool check_not_found, TRAPS);
 
   static InstanceKlass* define_class_from_cds(InstanceKlass *ik,
                                               Handle class_loader,
