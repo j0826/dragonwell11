@@ -148,6 +148,8 @@ public:
     return true;
   }
 
+  bool is_not_supported_source();
+
   const char* current_class_name() {
     return _class_name;
   }

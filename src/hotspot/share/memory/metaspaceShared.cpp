@@ -1754,6 +1754,10 @@ int MetaspaceShared::preload_classes(const char* class_list_path, TRAPS) {
       if (parser.dependence_not_loaded()) {
         continue;
       }
+      if (EagerAppCDS && parser.is_not_supported_source()) {
+        tty->print_cr("Preload Warning: Unsupported source with class %s", parser.current_class_name());
+        continue;
+      }
       Klass* klass = ClassLoaderExt::load_one_class(&parser, THREAD);
       if (HAS_PENDING_EXCEPTION) {
         if (klass == NULL &&
