@@ -97,6 +97,9 @@ define_pd_global(intx, InlineSmallCode,          1000);
   product(bool, NearCpool, true,                                        \
          "constant pool is close to instructions")                      \
                                                                         \
+  product(bool, UseVectorAPI, false,                                    \
+          "Enable Vector API")                                          \
+                                                                        \
   product(bool, UseBarriersForVolatile, false,                          \
           "Use memory barriers to implement volatile accesses")         \
   product(bool, UseNeon, false,                                         \

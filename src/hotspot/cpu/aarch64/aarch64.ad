@@ -2018,6 +2018,27 @@ int HandlerImpl::emit_deopt_handler(CodeBuffer& cbuf)
 
 //=============================================================================
 
+const bool Matcher::supports_vector_calling_convention() {
+  guarantee(false, "Should not reach here");
+  return false;
+}
+
+void Matcher::vector_calling_convention(VMRegPair *regs, uint num_bits, uint total_args_passed) {
+  guarantee(false, "Should not reach here");
+  return;
+}
+
+const bool Matcher::match_rule_supported_vector(int opcode, int vlen, BasicType bt, int op_arity) {
+  guarantee(false, "Should not reach here");
+  return false;
+}
+
+OptoRegPair Matcher::vector_return_value(uint ideal_reg) {
+  guarantee(false, "Should not reach here");
+  return false;
+}
+
+
 const bool Matcher::match_rule_supported(int opcode) {
 
   switch (opcode) {

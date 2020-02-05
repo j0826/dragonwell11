@@ -477,7 +477,12 @@ void CoroutineStack::frames_do(FrameClosure* fc) {
 
     frame fr(sp, fp, pc);
     StackFrameStream fst(_thread, fr);
+#ifdef X86
     fst.register_map()->set_location(rbp->as_VMReg(), (address)_last_sp);
+#else
+    // TODO: fix this on aarch64
+    guarantee(false, "Wisp is not supported on this arch");
+#endif // X86
     fst.register_map()->set_include_argument_oops(false);
     for(; !fst.is_done(); fst.next()) {
       fc->frames_do(fst.current(), fst.register_map());
@@ -494,7 +499,12 @@ frame CoroutineStack::last_frame(Coroutine* coro, RegisterMap& map) const {
   address pc = ((address*)_last_sp)[1];
   intptr_t* sp = ((intptr_t*)_last_sp) + 2;
 
+#ifdef X86
   map.set_location(rbp->as_VMReg(), (address)_last_sp);
+#else
+    // TODO: fix this on aarch64
+    guarantee(false, "Wisp is not supported on this arch");
+#endif // X86
   map.set_include_argument_oops(false);
 
   return frame(sp, fp, pc);

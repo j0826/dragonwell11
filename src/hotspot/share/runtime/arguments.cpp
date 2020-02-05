@@ -3726,6 +3726,30 @@ void Arguments::handle_extra_cms_flags(const char* msg) {
   }
 }
 
+#ifdef AARCH64
+
+#define UNSUPPORTED_AARCH64_OPTS(opt) \
+   if ((opt)) { \
+      tty->print_cr("Option %s is not supported on AARCH64, VM will exit", #opt); \
+      vm_abort(false); \
+   }
+
+// Some AJDK features are not supported in aarch64
+void Arguments::check_arguments_for_aarch64() {
+  UNSUPPORTED_AARCH64_OPTS(UseWisp2);
+  UNSUPPORTED_AARCH64_OPTS(UseVectorAPI);
+  UNSUPPORTED_AARCH64_OPTS(UseAppAOT || !PromoteAOTtoFullProfile);
+  UNSUPPORTED_AARCH64_OPTS(MultiTenant);
+  UNSUPPORTED_AARCH64_OPTS(TenantDataIsolation);
+  UNSUPPORTED_AARCH64_OPTS(TenantThreadStop);
+  UNSUPPORTED_AARCH64_OPTS(TenantCpuThrottling);
+  UNSUPPORTED_AARCH64_OPTS(EnableCoroutine);
+  UNSUPPORTED_AARCH64_OPTS(UseWispMonitor);
+  UNSUPPORTED_AARCH64_OPTS(PrintThreadCoroutineInfo);
+  UNSUPPORTED_AARCH64_OPTS(EagerAppCDS);
+}
+#endif // AARCH64
+
 // Parse entry point called from JNI_CreateJavaVM
 
 jint Arguments::parse(const JavaVMInitArgs* initial_cmd_args) {
@@ -3887,7 +3911,9 @@ jint Arguments::parse(const JavaVMInitArgs* initial_cmd_args) {
   if (!handle_deprecated_print_gc_flags()) {
     return JNI_EINVAL;
   }
-
+#ifdef AARCH64
+  check_arguments_for_aarch64();
+#endif //AARCH64
   if (UseWisp2) {
     // check Compatibility
     if (!EnableCoroutine && FLAG_IS_CMDLINE(EnableCoroutine)) {

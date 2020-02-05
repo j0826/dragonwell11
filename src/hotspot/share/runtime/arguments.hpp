@@ -487,6 +487,10 @@ class Arguments : AllStatic {
   static bool lookup_logging_aliases(const char* arg, char* buffer);
   static AliasedLoggingFlag catch_logging_aliases(const char* name, bool on);
 
+#ifdef AARCH64
+  static void check_arguments_for_aarch64();
+#endif
+
   static char*  SharedArchivePath;
 
  public:
