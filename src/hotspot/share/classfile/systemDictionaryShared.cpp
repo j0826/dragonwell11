@@ -612,16 +612,20 @@ InstanceKlass* SystemDictionaryShared::lookup_from_stream(const Symbol* class_na
     int clsfile_size  = cfs->length();
     int clsfile_crc32 = ClassLoader::crc32(0, (const char*)cfs->buffer(), cfs->length());
 
-    k = shared_dictionary()->find_class_for_unregistered_loader(class_name,
-                                                                clsfile_size, clsfile_crc32);
-  }
-
-  if (k == NULL) { // not archived
+    for (SharedDictionaryEntry *entry = shared_dictionary()->get_entry_for_unregistered_loader(class_name, -1, -1);
+         entry != NULL; entry = entry->next()) {
+      if (entry->_clsfile_size == clsfile_size &&
+          entry->_clsfile_crc32 == clsfile_crc32) {
+        k = entry->literal();
+        InstanceKlass *loaded = acquire_class_for_current_thread(InstanceKlass::cast(k), class_loader,
+                                                                 protection_domain, CHECK_NULL);
+        if (loaded != NULL) {
+          return loaded;
+        }
+      }
+    }
     return NULL;
   }
-
-  return acquire_class_for_current_thread(InstanceKlass::cast(k), class_loader,
-                                          protection_domain, THREAD);
 }
 
 bool SystemDictionaryShared::check_class_not_found(const Symbol *class_name, int hash_value, TRAPS) {
@@ -836,7 +840,7 @@ InstanceKlass* SystemDictionaryShared::acquire_class_for_current_thread(
   return shared_klass;
 }
 
-bool SystemDictionaryShared::add_non_builtin_klass(Symbol* name,
+void SystemDictionaryShared::add_non_builtin_klass(Symbol* name,
                                                    ClassLoaderData* loader_data,
                                                    InstanceKlass* k,
                                                    int initiating_loader_hash,
@@ -844,12 +848,9 @@ bool SystemDictionaryShared::add_non_builtin_klass(Symbol* name,
   assert(DumpSharedSpaces, "only when dumping");
   assert(boot_loader_dictionary() != NULL, "must be");
 
-  if (boot_loader_dictionary()->add_non_builtin_klass(name, loader_data, k, initiating_loader_hash)) {
-    MutexLocker mu_r(Compile_lock, THREAD); // not really necessary, but add_to_hierarchy asserts this.
-    add_to_hierarchy(k, CHECK_0);
-    return true;
-  }
-  return false;
+  boot_loader_dictionary()->add_non_builtin_klass(name, loader_data, k, initiating_loader_hash);
+  MutexLocker mu_r(Compile_lock, THREAD); // not really necessary, but add_to_hierarchy asserts this.
+  add_to_hierarchy(k, CHECK);
 }
 
 // This function is called to resolve the super/interfaces of shared classes for
@@ -1171,7 +1172,7 @@ void SharedDictionaryEntry::metaspace_pointers_do(MetaspaceClosure* it) {
   it->push((Array<char>**)&_verifier_constraint_flags);
 }
 
-bool SharedDictionary::add_non_builtin_klass(const Symbol* class_name,
+void SharedDictionary::add_non_builtin_klass(const Symbol* class_name,
                                              ClassLoaderData* loader_data,
                                              InstanceKlass* klass,
                                              int initiating_loader_hash) {
@@ -1198,8 +1199,7 @@ bool SharedDictionary::add_non_builtin_klass(const Symbol* class_name,
         if (EagerAppCDS && entry->initiating_loader_hash() != initiating_loader_hash) {
           continue;
         } else {
-          // There is already a class defined with the same name
-          return false;
+          assert(DumpSharedSpaces, "we allow duplicate classes dumping for AppCDS/EagerAppCDS");
         }
       }
     }
@@ -1211,7 +1211,6 @@ bool SharedDictionary::add_non_builtin_klass(const Symbol* class_name,
 
   assert(entry->is_unregistered(), "sanity");
   assert(!entry->is_builtin(), "sanity");
-  return true;
 }
 
 

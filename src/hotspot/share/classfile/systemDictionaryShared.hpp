@@ -182,7 +182,7 @@ public:
   SharedDictionaryEntry* find_entry_for(Klass* klass);
   void finalize_verification_constraints();
 
-  bool add_non_builtin_klass(const Symbol* class_name,
+  void add_non_builtin_klass(const Symbol* class_name,
                              ClassLoaderData* loader_data,
                              InstanceKlass* obj,
                              int initiating_loader_hash);
@@ -326,7 +326,7 @@ public:
     return NULL;
   }
 
-  static bool add_non_builtin_klass(Symbol* class_name, ClassLoaderData* loader_data,
+  static void add_non_builtin_klass(Symbol* class_name, ClassLoaderData* loader_data,
                                     InstanceKlass* k, int initiating_loader_hash, TRAPS);
   static Klass* dump_time_resolve_super_or_fail(Symbol* child_name,
                                                 Symbol* class_name,

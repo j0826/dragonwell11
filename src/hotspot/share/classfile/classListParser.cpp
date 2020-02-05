@@ -353,11 +353,9 @@ InstanceKlass* ClassListParser::load_class_from_source(Symbol* class_name, TRAPS
             _interfaces->length(), k->local_interfaces()->length());
     }
 
-    if (!SystemDictionaryShared::add_non_builtin_klass(class_name, ClassLoaderData::the_null_class_loader_data(),
-                                                       k, _initiating_loader_hash == _unspecified ? 0 : _initiating_loader_hash,
-                                                       THREAD)) {
-      error("Duplicated class %s", _class_name);
-    }
+    SystemDictionaryShared::add_non_builtin_klass(class_name, ClassLoaderData::the_null_class_loader_data(),
+                                                  k, _initiating_loader_hash == _unspecified ? 0 : _initiating_loader_hash,
+                                                  THREAD);
 
     // This tells JVM_FindLoadedClass to not find this class.
     k->set_shared_classpath_index(UNREGISTERED_INDEX);
