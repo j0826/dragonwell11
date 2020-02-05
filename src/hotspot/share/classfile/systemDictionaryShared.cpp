@@ -636,7 +636,8 @@ InstanceKlass* SystemDictionaryShared::lookup_from_stream(const Symbol* class_na
     for (SharedDictionaryEntry *entry = shared_dictionary()->get_entry_for_unregistered_loader(class_name, -1, -1);
          entry != NULL; entry = entry->next()) {
       if (entry->_clsfile_size == clsfile_size &&
-          entry->_clsfile_crc32 == clsfile_crc32) {
+          entry->_clsfile_crc32 == clsfile_crc32 &&
+          (EagerAppCDS ? entry->_defining_loader_hash == java_lang_ClassLoader::signature(class_loader()) : true)) {
         k = entry->literal();
         InstanceKlass *loaded = acquire_class_for_current_thread(InstanceKlass::cast(k), class_loader,
                                                                  protection_domain, CHECK_NULL);
@@ -1220,7 +1221,7 @@ void SharedDictionary::add_non_builtin_klass(const Symbol* class_name,
         if (EagerAppCDS && entry->initiating_loader_hash() != initiating_loader_hash) {
           continue;
         } else {
-          assert(DumpSharedSpaces, "we allow duplicate classes dumping for AppCDS/EagerAppCDS");
+          assert(DumpSharedSpaces || EagerAppCDS, "we allow duplicate classes dumping for AppCDS/EagerAppCDS");
         }
       }
     }
