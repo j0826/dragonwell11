@@ -24,7 +24,20 @@
 
 #include "precompiled.hpp"
 #include "runtime/arguments.hpp"
+#include "runtime/arguments_ext.hpp"
 
 bool lookup_special_flag_ext(const char *flag_name, SpecialFlag& flag) {
   return false;
+}
+
+void ArgumentsExt::check_tenant_options() {
+  if (TenantCpuAccounting || TenantCpuThrottling
+      || TenantThreadStop || TenantDataIsolation){
+    if (FLAG_IS_DEFAULT(MultiTenant)) {
+      FLAG_SET_ERGO(bool, MultiTenant, true);
+    }
+    if (!MultiTenant) {
+      vm_exit_during_initialization("Must enable -XX:+MultiTenant!");
+    }
+  }
 }

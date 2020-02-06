@@ -34,7 +34,14 @@ public:
   // no additional parsing needed in Arguments::parse() for the option.
   // Otherwise returns false.
   static inline bool process_options(const JavaVMOption *option) { return false; }
-  static inline void report_unsupported_options() { }
+  static inline void report_unsupported_options() {
+    check_tenant_options();
+  }
+
+private:
+  // Extra checking on extended options from globals_ext.hpp, etc.
+  static void check_tenant_options();
+
 };
 
 #endif // SHARE_VM_RUNTIME_ARGUMENTS_EXT_HPP

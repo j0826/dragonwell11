@@ -4620,7 +4620,7 @@ bool Threads::destroy_vm() {
   thread->invoke_shutdown_hooks();
 
   // invoke JGroup.destroyJGroupClass!
-  if (TenantCpuThrottling || TenantCpuAccounting) {
+  if (MultiTenant && (TenantCpuThrottling || TenantCpuAccounting)) {
     EXCEPTION_MARK;
     Klass* klass =  SystemDictionary::resolve_or_null(vmSymbols::com_alibaba_tenant_JGroup(), THREAD);
     if (klass != NULL) {
