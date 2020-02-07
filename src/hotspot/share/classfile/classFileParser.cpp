@@ -5787,6 +5787,7 @@ void ClassFileParser::log_loaded_klass(InstanceKlass* ik, const ClassFileStream 
   const char *name = ik->name()->as_C_string();
   bool is_builtin = loader_data->is_builtin_class_loader_data();
 
+  MutexLocker mu(DumpLoadedClassList_lock, THREAD);
   if (is_builtin) {
     if(!should_skip_class(loader_data, stream)) {
       classlist_file->print("%s klass: " INTPTR_FORMAT, name, p2i(ik));
@@ -5801,7 +5802,6 @@ void ClassFileParser::log_loaded_klass(InstanceKlass* ik, const ClassFileStream 
     // TestSimple source: file:/tmp/classes/com/alibaba/cds/TestDumpAndLoadClass.d/ klass: 0x0000000800066840
     // super: 0x0000000800001000 defining_loader_hash: fa474cbf fingerprint: 0x00000199e3c89ea7
     // If the signature is 0, still dump the class loading information for AppCDS usage
-    MutexLocker mu(DumpLoadedClassList_lock, THREAD);
     classlist_file->print("%s source: %s klass: " INTPTR_FORMAT, name, stream->source(), p2i(ik));
     classlist_file->print(" super: " INTPTR_FORMAT, p2i(ik->superklass()));
 
