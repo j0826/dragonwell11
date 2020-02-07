@@ -9,7 +9,19 @@ else
   PREBUILD=1
 fi
 
+arch=`uname -m`
+if [[ ${arch} != "x86_64" ]] && [[ ${arch} != "aarch64" ]]; then
+  echo "Unrecognized architecture: ${arch}"
+  exit 1
+fi
+
 DOCKER_IMAGE=reg.docker.alibaba-inc.com/ajdk/11.alios7
+if [[ $arch == 'aarch64' ]]; then
+  DOCKER_IMAGE=reg.docker.alibaba-inc.com/ajdk/ajdk11_build.alios7.aarch64
+  NET_ARG="--net host"
+fi
+
+
 SCRIPT_NAME=`basename $0`
 VERSION_INTERIM=0
 VERSION_UPDATE=5
@@ -21,13 +33,15 @@ ps -e | grep docker
 if [ $? -eq 0 ]; then
     echo "We will build AJDK in Docker!"
     sudo docker pull $DOCKER_IMAGE
-    sudo docker run -i --rm -e BUILD_NUMBER=$BUILD_NUMBER -v `pwd`:`pwd` -w `pwd` \
-               --entrypoint=bash $DOCKER_IMAGE `pwd`/$SCRIPT_NAME $1 $USER $BUILD_UID
+    sudo docker run -i --rm $NET_ARG -e BUILD_NUMBER=$BUILD_NUMBER -v `pwd`:`pwd` -w `pwd` \
+               --entrypoint=bash $DOCKER_IMAGE `pwd`/$SCRIPT_NAME $1
     exit $?
 fi
 
 LC_ALL=C
 BUILD_MODE=$1
+
+\rm -rf build
 
 if [ $PREBUILD -eq 1 ]; then
     # create user in docker image
@@ -55,15 +69,15 @@ rm -rf src/jdk.aot/share/classes/jdk.tools.jaotc.test
 case "$BUILD_MODE" in
     release)
         DEBUG_LEVEL="release"
-        JDK_IMAGES_DIR=`pwd`/build/linux-x86_64-normal-server-release/images
+        JDK_IMAGES_DIR=`pwd`/build/linux-$arch-normal-server-release/images
     ;;
     debug)
         DEBUG_LEVEL="slowdebug"
-        JDK_IMAGES_DIR=`pwd`/build/linux-x86_64-normal-server-slowdebug/images
+        JDK_IMAGES_DIR=`pwd`/build/linux-$arch-normal-server-slowdebug/images
     ;;
     fastdebug)
         DEBUG_LEVEL="fastdebug"
-        JDK_IMAGES_DIR=`pwd`/build/linux-x86_64-normal-server-fastdebug/images
+        JDK_IMAGES_DIR=`pwd`/build/linux-$arch-normal-server-fastdebug/images
     ;;
     *)
         echo "Argument must be release, debug or fastdebug!"
@@ -76,8 +90,10 @@ NEW_JAVA_HOME=$JDK_IMAGES_DIR/jdk
 if [ "x${BUILD_NUMBER}" = "x" ]; then
   BUILD_NUMBER=0
 fi
+if [[ $arch == 'x86_64' ]]; then
+  export LDFLAGS_JDK="-L/vmfarm/tools/jemalloc-4.5.0/lib -ljemalloc"
+fi
 
-export LDFLAGS_JDK="-L/vmfarm/tools/jemalloc-4.5.0/lib -ljemalloc"
 bash ./configure --with-freetype=system \
                  --enable-unlimited-crypto \
                  --with-jtreg=/vmfarm/tools/jtreg4.2 \
@@ -109,8 +125,12 @@ git checkout src/jdk.aot
 git checkout src/jdk.internal.vm.compiler.management
 git checkout make/CompileJavaModules.gmk
 
+if [[ $arch == 'x86_64' ]]; then
 \cp -f /vmfarm/tools/hsdis/8/amd64/hsdis-amd64.so  $NEW_JAVA_HOME/lib/
 \cp -f /vmfarm/tools/jemalloc-4.5.0/lib/libjemalloc.so.2 $NEW_JAVA_HOME/lib/
+else
+\cp -f /vmfarm/hsdis-aarch64.so $NEW_JAVA_HOME/lib/
+fi
 
 # Sanity tests
 echo "================= Start sanity test ======================"
