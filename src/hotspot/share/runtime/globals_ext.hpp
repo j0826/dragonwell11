@@ -90,6 +90,18 @@
   product(double, ZHighUsagePercent, 95.0,                                  \
           "Percentage of heap usage for ZGC high usage rule")               \
                                                                             \
+  product(bool, ZBalancePageCache, false,                                   \
+          "Balance small and medium cached pages to avoid "                 \
+          "page cache flush while relocating")                              \
+                                                                            \
+  diagnostic(double, ZMinPageCachePercent, 1.0,                             \
+          "Lower bound of percentage of heap capacity for "                 \
+          "cached small or medium pages")                                   \
+                                                                            \
+  diagnostic(uintx, ZPageAllocRateSampleWindow, 60,                         \
+          "Sample windows (seconds) for small and medium page "             \
+          "allocation rate")                                                \
+                                                                            \
   product(bool, IgnoreInvalidEntryAtStringTableExpansion, true,             \
           "ignore invalid node in StringTable when growing")                \
                                                                             \
