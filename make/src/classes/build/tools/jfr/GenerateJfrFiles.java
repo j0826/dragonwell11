@@ -6,13 +6,17 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.StringJoiner;
 import java.util.function.Predicate;
+import java.util.stream.Stream;
 
 import javax.xml.XMLConstants;
 import javax.xml.parsers.ParserConfigurationException;
@@ -28,10 +32,10 @@ import org.xml.sax.helpers.DefaultHandler;
 public class GenerateJfrFiles {
 
     public static void main(String... args) throws Exception {
-        if (args.length != 3) {
+        if (args.length != 3 && args.length != 4) {
             System.err.println("Incorrect number of command line arguments.");
             System.err.println("Usage:");
-            System.err.println("java GenerateJfrFiles[.java] <path-to-metadata.xml> <path-to-metadata.xsd> <output-directory>");
+            System.err.println("java GenerateJfrFiles[.java] <path-to-metadata.xml> <path-to-metadata.xsd> <output-directory> <expected-event-classes-hpp-result(optional, only for test purpose)>");
             System.exit(1);
         }
         try {
@@ -49,9 +53,54 @@ public class GenerateJfrFiles {
             printJfrTypesHpp(metadata, outputDirectory);
             printJfrEventClassesHpp(metadata, outputDirectory);
 
+            if (args.length == 4) {
+                verifyJfrEventClassesContent(outputDirectory, args[3]);
+            }
+
         } catch (Exception e) {
             e.printStackTrace();
             System.exit(1);
+        }
+    }
+
+    private static void verifyJfrEventClassesContent(File outputDirectory, String expectedResult) throws Exception {
+        String ls = "\n";
+        try (Stream<String> ss = Files.lines(outputDirectory.toPath().resolve("jfrEventClasses.hpp"));
+             Stream<String> ds = Files.lines(Path.of(expectedResult))) {
+
+            int lineNo = 0;
+            String actual = null;
+            String expected = null;
+            boolean mismatched = false;
+
+            Iterator<String> si = ss.iterator();
+            Iterator<String> di = ds.iterator();
+            while (true) {
+                lineNo++;
+                actual = si.hasNext() ? si.next() : null;
+                expected = di.hasNext() ? di.next() : null;
+                if (actual == null) {
+                    mismatched = expected != null;
+                    break;
+                } else if (!actual.equals(expected)) {
+                    mismatched = true;
+                    break;
+                }
+            }
+
+            if (mismatched) {
+                StringBuilder error = new StringBuilder();
+                error.append("Verify the content of jfrEventClasses.hpp failed at line:" + lineNo).append(ls)
+                     .append("The results generated:").append(ls)
+                     .append("=======").append(ls)
+                     .append(actual).append(ls)
+                     .append("=======").append(ls)
+                     .append("The results expected:").append(ls)
+                     .append("=======").append(ls)
+                     .append(expected).append(ls)
+                     .append("=======").append(ls);
+                throw new IllegalStateException(error.toString());
+            }
         }
     }
 
@@ -162,6 +211,7 @@ public class GenerateJfrFiles {
         String name;
         String typeName;
         boolean struct;
+        boolean array;
 
         FieldElement(Metadata metadata) {
             this.metadata = metadata;
@@ -169,11 +219,11 @@ public class GenerateJfrFiles {
 
         String getParameterType() {
             if (struct) {
-                return "const JfrStruct" + typeName + "&";
+                return "const JfrStruct" + typeName + (array ? "*" : "&");
             }
             XmlType xmlType = metadata.xmlTypes.get(typeName);
             if (xmlType != null) {
-                return xmlType.parameterType;
+                return xmlType.parameterType + (array ? "*" : "");
             }
             return type != null ? "u8" : typeName;
         }
@@ -184,11 +234,11 @@ public class GenerateJfrFiles {
 
         String getFieldType() {
             if (struct) {
-                return "JfrStruct" + typeName;
+                return "JfrStruct" + typeName + (array ? "*" : "");
             }
             XmlType xmlType = metadata.xmlTypes.get(typeName);
             if (xmlType != null) {
-                return xmlType.fieldType;
+                return xmlType.fieldType + (array ? "*" : "");
             }
             return type != null ? "u8" : typeName;
         }
@@ -233,6 +283,7 @@ public class GenerateJfrFiles {
                 currentField.struct = getBoolean(attributes, "struct", false);
                 currentField.name = attributes.getValue("name");
                 currentField.typeName = attributes.getValue("type");
+                currentField.array = getBoolean(attributes, "array", false);
                 break;
             }
         }
@@ -524,12 +575,19 @@ public class GenerateJfrFiles {
             StringJoiner sj = new StringJoiner(",\n    ");
             for (FieldElement f : event.fields) {
                 sj.add(f.getParameterType());
+                if (f.array) {
+                    sj.add("uint");
+                }
             }
             out.write("  Event" + event.name + "(");
             out.write("    " + sj.toString() + ") { }");
         }
         for (FieldElement f : event.fields) {
-            out.write("  void set_" + f.name + "(" + f.getParameterType() + ") { }");
+            if (f.array) {
+                out.write("  void set_" + f.name + "(" + f.getParameterType() + ", uint) { }");
+            } else {
+                out.write("  void set_" + f.name + "(" + f.getParameterType() + ") { }");
+            }
         }
         out.write("};");
     }
@@ -539,7 +597,11 @@ public class GenerateJfrFiles {
         out.write("{");
         out.write(" public:");
         for (FieldElement f : t.fields) {
-            out.write("  void set_" + f.name + "(" + f.getParameterType() + ") { }");
+            if (f.array) {
+                out.write("  void set_" + f.name + "(" + f.getParameterType() + ", uint) { }");
+            } else {
+                out.write("  void set_" + f.name + "(" + f.getParameterType() + ") { }");
+            }
         }
         out.write("};");
     }
@@ -582,8 +644,22 @@ public class GenerateJfrFiles {
         out.write("");
         int index = 0;
         for (FieldElement f : event.fields) {
-            out.write("  void set_" + f.name + "(" + f.getParameterType() + " " + f.getParameterName() + ") {");
-            out.write("    this->_" + f.name + " = " + f.getParameterName() + ";");
+            if (f.array) {
+                out.write("  void set_" + f.name + "("
+                          + f.getParameterType() + " " + f.getParameterName() + ", "
+                          + "uint" + " " + f.getParameterName() + "_length"
+                          + ") {");
+                out.write("    this->_" + f.name + "_length" + " = " + f.getParameterName() + "_length" + ";");
+                if (f.struct) {
+                    out.write("    this->_" + f.name + " = " + "const_cast<" + f.getFieldType() + ">(" +
+                              f.getParameterName() + ");");
+                } else {
+                    out.write("    this->_" + f.name + " = " + f.getParameterName() + ";");
+                }
+            } else {
+                out.write("  void set_" + f.name + "(" + f.getParameterType() + " " + f.getParameterName() + ") {");
+                out.write("    this->_" + f.name + " = " + f.getParameterName() + ";");
+            }
             out.write("    DEBUG_ONLY(set_field_bit(" + index++ + "));");
             out.write("  }");
         }
@@ -601,7 +677,16 @@ public class GenerateJfrFiles {
         out.write("  template <typename Writer>");
         out.write("  void writeData(Writer& w) {");
         for (FieldElement field : fields) {
-            if (field.struct) {
+            if (field.array) {
+                out.write("    w.write(" + "_" + field.name + "_length);");
+                out.write("    for (uint __index = 0; __index < _" + field.name + "_length;" + " __index++) {");
+                if (field.struct) {
+                    out.write("        _" + field.name + "[__index]" + ".writeData(w);");
+                } else {
+                    out.write("        w.write(" + "_" + field.name + "[__index]);");
+                }
+                out.write("    }");
+            } else if (field.struct) {
                 out.write("    _" + field.name + ".writeData(w);");
             } else {
                 out.write("    w.write(_" + field.name + ");");
@@ -611,7 +696,20 @@ public class GenerateJfrFiles {
     }
 
     private static void printTypeSetter(Printer out, FieldElement field) {
-        out.write("  void set_" + field.name + "(" + field.getParameterType() + " new_value) { this->_" + field.name + " = new_value; }");
+        if (field.array) {
+            String value = "new_value";
+            if (field.struct) {
+                value = "const_cast<" + field.getFieldType() + ">(" + value + ")";
+            }
+            out.write(
+                "  void set_" + field.name + "(" + field.getParameterType() +
+                " new_value, uint new_value_length) { this->_" + field.name +
+                " = " + value + "; this->_" + field.name + "_length = new_value_length; }");
+        } else {
+            out.write(
+                "  void set_" + field.name + "(" + field.getParameterType() + " new_value) { this->_" + field.name +
+                " = new_value; }");
+        }
     }
 
     private static void printVerify(Printer out, List<FieldElement> fields) {
@@ -631,12 +729,19 @@ public class GenerateJfrFiles {
             StringJoiner sj = new StringJoiner(",\n              ");
             for (FieldElement f : event.fields) {
                 sj.add(f.getParameterType() + " " + f.name);
+                if (f.array) {
+                    sj.add("uint" + " " + f.name + "_length");
+                }
             }
             out.write("");
             out.write("  void commit(" + sj.toString() + ") {");
             out.write("    if (should_commit()) {");
             for (FieldElement f : event.fields) {
-                out.write("      set_" + f.name + "(" + f.name + ");");
+                if (f.array) {
+                    out.write("      set_" + f.name + "(" + f.name + ", " + f.name + "_length" +");");
+                } else {
+                    out.write("      set_" + f.name + "(" + f.name + ");");
+                }
             }
             out.write("      commit();");
             out.write("    }");
@@ -650,6 +755,9 @@ public class GenerateJfrFiles {
         }
         for (FieldElement f : event.fields) {
             sj.add(f.getParameterType() + " " + f.name);
+            if (f.array) {
+                sj.add("uint" + " " + f.name + "_length");
+            }
         }
         out.write("  static void commit(" + sj.toString() + ") {");
         out.write("    Event" + event.name + " me(UNTIMED);");
@@ -660,7 +768,11 @@ public class GenerateJfrFiles {
             out.write("      me.set_endtime(endTicks);");
         }
         for (FieldElement f : event.fields) {
-            out.write("      me.set_" + f.name + "(" + f.name + ");");
+            if (f.array) {
+                out.write("      me.set_" + f.name + "(" + f.name + ", " + f.name + "_length" +");");
+            } else {
+                out.write("      me.set_" + f.name + "(" + f.name + ");");
+            }
         }
         out.write("      me.commit();");
         out.write("    }");
@@ -678,11 +790,18 @@ public class GenerateJfrFiles {
             StringJoiner sj = new StringJoiner(",\n    ");
             for (FieldElement f : event.fields) {
                 sj.add(f.getParameterType() + " " + f.name);
+                if (f.array) {
+                    sj.add("uint" + " " + f.name + "_length");
+                }
             }
             out.write("    " + sj.toString() + ") : JfrEvent<Event" + event.name + ">(TIMED) {");
             out.write("    if (should_commit()) {");
             for (FieldElement f : event.fields) {
-                out.write("      set_" + f.name + "(" + f.name + ");");
+                if (f.array) {
+                    out.write("      set_" + f.name + "(" + f.name + ", " + f.name + "_length" +");");
+                } else {
+                    out.write("      set_" + f.name + "(" + f.name + ");");
+                }
             }
             out.write("    }");
             out.write("  }");
@@ -691,5 +810,8 @@ public class GenerateJfrFiles {
 
     private static void printField(Printer out, FieldElement field) {
         out.write("  " + field.getFieldType() + " _" + field.name + ";");
+        if (field.array) {
+            out.write("  " + "uint" + " _" + field.name + "_length" + ";");
+        }
     }
 }

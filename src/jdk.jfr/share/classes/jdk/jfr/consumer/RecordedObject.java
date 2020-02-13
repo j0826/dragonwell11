@@ -277,6 +277,11 @@ public class RecordedObject {
                 // without invoking ObjectFactory for every instance (which may require id)
                 if (isStackFrameType(v.getTypeName())) {
                     structArray[i] = new RecordedFrame(v.getFields(), (Object[]) arrayElement, timeConverter);
+                }
+                // constant type array support
+                else if (arrayElement instanceof RecordedClass || arrayElement instanceof RecordedMethod ||
+                         arrayElement instanceof RecordedClassLoader || arrayElement instanceof RecordedThread) {
+                    structArray[i] = arrayElement;
                 } else {
                     structArray[i] = new RecordedObject(v.getFields(), (Object[]) arrayElement, timeConverter);
                 }

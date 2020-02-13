@@ -65,3 +65,17 @@ $(JFR_OUTPUTDIR)/jfrEventClasses.hpp: $(METADATA_XML) $(METADATA_XSD) \
 	test -f $@
 
 TARGETS += $(JFR_OUTPUTDIR)/jfrEventClasses.hpp
+
+# Test
+JFR_TEST_OUTPUTDIR := $(JVM_VARIANT_OUTPUTDIR)/gensrc/test/testjfrfiles
+TEST_METADATA_XML := $(TOPDIR)/make/src/classes/build/tools/jfr/test/TestMetadata.xml
+TEST_EXPECTED_JFR_EVENT_CLASSESS_HPP := $(TOPDIR)/make/src/classes/build/tools/jfr/test/JfrEventClasses.hpp
+
+$(JFR_TEST_OUTPUTDIR)/jfrEventClasses.hpp: $(TEST_METADATA_XML) $(METADATA_XSD) $(TEST_EXPECTED_JFR_EVENT_CLASSESS_HPP) \
+    $(BUILD_JFR_TOOLS)
+	$(call LogInfo, Generating $(@F))
+	$(call MakeDir, $(@D))
+	$(call ExecuteWithLog, $@, $(TOOL_JFR_GEN) $(TEST_METADATA_XML) $(METADATA_XSD) $(JFR_TEST_OUTPUTDIR) $(TEST_EXPECTED_JFR_EVENT_CLASSESS_HPP))
+	test -f $@
+
+TARGETS += $(JFR_TEST_OUTPUTDIR)/jfrEventClasses.hpp

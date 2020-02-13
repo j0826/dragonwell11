@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Metadata>
+  <Event name="TestArrayField" category="Java Virtual Machine, Test" label="Test Event">
+    <Field type="uint" name="firstField" label="First Field"/>
+    <Field type="Class" name="secondField" label="Second Field"/>
+    <Field type="uint" name="thirdField" array="true" label="Third Field"/>
+    <Field type="Class" name="fourthFiekd" array="true" label="Fourth Field"/>
+  </Event>
+  <XmlType name="Class" javaType="java.lang.Class" parameterType="const Klass*" fieldType="const Klass*"/>
+  <XmlType name="uint" javaType="int" unsigned="true" parameterType="unsigned" fieldType="unsigned"/>
+</Metadata>
