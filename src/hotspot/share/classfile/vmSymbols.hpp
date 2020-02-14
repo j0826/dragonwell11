@@ -799,10 +799,6 @@
   template(classRedefinedCount_name,                   "classRedefinedCount")                                     \
   template(classLoader_name,                           "classLoader")                                             \
   template(componentType_name,                         "componentType")                                           \
-  /* CDS support */                                                                                               \
-  template(com_alibaba_cds_NotFoundClassSet,           "com/alibaba/cds/NotFoundClassSet")                        \
-  template(isNotFound_name,                            "isNotFound")                                              \
-  template(isNotFound_signature,                       "(Ljava/lang/String;I)Z")                                  \
   /* coroutine support */                                                                                         \
   template(java_dyn_CoroutineSupport,                  "java/dyn/CoroutineSupport")                               \
   template(java_dyn_CoroutineBase,                     "java/dyn/CoroutineBase")                                  \

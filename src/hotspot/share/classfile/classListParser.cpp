@@ -451,6 +451,8 @@ Klass* ClassListParser::load_current_class(TRAPS) {
     // If "source:" tag is specified, all super class and super interfaces must be specified in the
     // class list file.
     if (NotFoundClassOpt && strstr(_source, NOT_FOUND_CLASS)) {
+      SystemDictionaryShared::record_not_found_class(class_name_symbol,
+                                                     _initiating_loader_hash == _unspecified ? 0 : _initiating_loader_hash);
       return NULL;
     } else {
       klass = load_class_from_source(class_name_symbol, CHECK_NULL);

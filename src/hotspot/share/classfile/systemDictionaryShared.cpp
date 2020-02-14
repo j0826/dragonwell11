@@ -688,26 +688,17 @@ InstanceKlass* SystemDictionaryShared::lookup_from_stream(const Symbol* class_na
   }
 }
 
-bool SystemDictionaryShared::check_class_not_found(const Symbol *class_name, int hash_value, TRAPS) {
-  Klass *klass = SystemDictionary::resolve_or_fail(vmSymbols::com_alibaba_cds_NotFoundClassSet(), true, CHECK_false);
-
-  JavaValue result(T_BOOLEAN);
-  JavaCallArguments args(2);
-  // arg 1
-  Handle s = java_lang_String::create_from_symbol(const_cast<Symbol*>(class_name), CHECK_false);
-  args.push_oop(s);
-
-  // arg 2
-  args.push_int(hash_value);
-
-  JavaCalls::call_static(&result,
-                         klass,
-                         vmSymbols::isNotFound_name(),
-                         vmSymbols::isNotFound_signature(),
-                         &args,
-                         CHECK_AND_CLEAR_false);
-
-  return result.get_jboolean();
+bool SystemDictionaryShared::check_not_found_class(Symbol *class_name, int hash_value) {
+  NotFoundClassTable* table = not_found_class_table();
+  if (table == NULL) {
+    return false;
+  }
+  unsigned int hash = table->compute_hash(class_name);
+  int index = table->index_for(class_name);
+  if (table->find_entry(index, hash, class_name, hash_value) != NULL) {
+    return true;
+  }
+  return false;
 }
 
 InstanceKlass* SystemDictionaryShared::load_class_from_cds(const Symbol* class_name,
@@ -789,7 +780,7 @@ InstanceKlass* SystemDictionaryShared::load_class_from_cds(const Symbol* class_n
        | load successfully, and return InstanceKlass |
        +---------------------------------------------+
 */
-InstanceKlass* SystemDictionaryShared::lookup_shared(const Symbol* class_name, Handle class_loader,
+InstanceKlass* SystemDictionaryShared::lookup_shared(Symbol* class_name, Handle class_loader,
                                                      bool& not_found, bool check_not_found, TRAPS) {
   assert(EagerAppCDS, "must be EagerAppCDS");
 
@@ -815,11 +806,11 @@ InstanceKlass* SystemDictionaryShared::lookup_shared(const Symbol* class_name, H
     }
   }
 
-  if (NotFoundClassOpt && check_not_found && !loop && check_class_not_found(class_name, loader_hash, THREAD)) {
-      not_found = true;
-      log_trace(class, eagerappcds) ("[CDS load class] Not found class %s with class loader %s (%x)", class_name->as_C_string(),
-                class_loader()->klass()->name()->as_C_string(), loader_hash);
-      return NULL;
+  if (NotFoundClassOpt && check_not_found && !loop && check_not_found_class(class_name, loader_hash)) {
+    not_found = true;
+    log_trace(class, eagerappcds) ("[CDS load class] Not found class %s with class loader %s (%x)", class_name->as_C_string(),
+              class_loader()->klass()->name()->as_C_string(), loader_hash);
+    return NULL;
   }
 
   if (log_is_enabled(Trace, class, eagerappcds)) {
@@ -898,6 +889,24 @@ InstanceKlass* SystemDictionaryShared::acquire_class_for_current_thread(
   }
 
   return shared_klass;
+}
+
+
+void SystemDictionaryShared::record_not_found_class(Symbol* class_name, int hash_value) {
+  assert(DumpSharedSpaces, "must be in dump phase");
+  assert(boot_loader_dictionary() != NULL, "must be");
+  assert(NotFoundClassOpt, "must be with the opt for not found class");
+
+  if (not_found_class_table() == NULL) {
+    create_not_found_class_table();
+  }
+
+  NotFoundClassTable* table = not_found_class_table();
+  unsigned int hash = table->compute_hash(class_name);
+  int index = table->index_for(class_name);
+  if (table->find_entry(index, hash, class_name, hash_value) == NULL) {
+    table->add_entry(index, hash, class_name, hash_value);
+  }
 }
 
 void SystemDictionaryShared::add_non_builtin_klass(Symbol* name,

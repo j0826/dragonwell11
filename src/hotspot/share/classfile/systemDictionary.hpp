@@ -75,6 +75,7 @@
 
 class ClassFileStream;
 class Dictionary;
+class NotFoundClassTable;
 class PlaceholderTable;
 class LoaderConstraintTable;
 template <MEMFLAGS F> class HashtableBucket;
@@ -397,6 +398,7 @@ public:
 public:
   // Sharing support.
   static void reorder_dictionary_for_sharing() NOT_CDS_RETURN;
+  static void reorder_not_found_class_table_for_sharing() NOT_CDS_RETURN;
   static void combine_shared_dictionaries();
   static size_t count_bytes_for_buckets();
   static size_t count_bytes_for_table();
@@ -404,6 +406,16 @@ public:
   static void copy_table(char* top, char* end);
   static void set_shared_dictionary(HashtableBucket<mtClass>* t, int length,
                                     int number_of_entries);
+
+  static void create_not_found_class_table();
+  static size_t count_bytes_for_not_found_class_buckets();
+  static size_t count_bytes_for_not_found_class_table();
+  static void copy_not_found_class_buckets(char* top, char* end);
+  static void copy_not_found_class_table(char* top, char* end);
+  static void set_not_found_class_table(HashtableBucket<mtSymbol>* t, int length,
+                                  int number_of_entries);
+  static NotFoundClassTable* not_found_class_table() { return _not_found_class_table; }
+
   // Printing
   static void print() { return print_on(tty); }
   static void print_on(outputStream* st);
@@ -618,6 +630,8 @@ public:
 
   // Hashtable holding classes from the shared archive.
   static Dictionary*             _shared_dictionary;
+
+  static NotFoundClassTable*          _not_found_class_table;
 
   // Monotonically increasing counter which grows with
   // loading classes as well as hot-swapping and breakpoint setting

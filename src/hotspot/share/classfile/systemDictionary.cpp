@@ -92,6 +92,7 @@
 
 PlaceholderTable*      SystemDictionary::_placeholders        = NULL;
 Dictionary*            SystemDictionary::_shared_dictionary   = NULL;
+NotFoundClassTable*    SystemDictionary::_not_found_class_table = NULL;
 LoaderConstraintTable* SystemDictionary::_loader_constraints  = NULL;
 ResolutionErrorTable*  SystemDictionary::_resolution_errors   = NULL;
 SymbolPropertyTable*   SystemDictionary::_invoke_method_table = NULL;
@@ -1168,6 +1169,17 @@ InstanceKlass* SystemDictionary::resolve_from_stream(Symbol* class_name,
 }
 
 #if INCLUDE_CDS
+void SystemDictionary::set_not_found_class_table(HashtableBucket<mtSymbol>* t, int length,
+                                            int number_of_entries) {
+  assert(UseSharedSpaces, "must be");
+  _not_found_class_table = new NotFoundClassTable(_shared_dictionary_size, t, number_of_entries);
+}
+
+void SystemDictionary::create_not_found_class_table() {
+  assert(DumpSharedSpaces, "must be in dump phase");
+  _not_found_class_table = new NotFoundClassTable(_shared_dictionary_size);
+}
+
 void SystemDictionary::set_shared_dictionary(HashtableBucket<mtClass>* t, int length,
                                              int number_of_entries) {
   assert(length == _shared_dictionary_size * sizeof(HashtableBucket<mtClass>),
@@ -2985,6 +2997,13 @@ ProtectionDomainCacheEntry* SystemDictionary::cache_get(Handle protection_domain
 void SystemDictionary::reorder_dictionary_for_sharing() {
   ClassLoaderData::the_null_class_loader_data()->dictionary()->reorder_dictionary_for_sharing();
 }
+
+void SystemDictionary::reorder_not_found_class_table_for_sharing() {
+  assert(DumpSharedSpaces, "must be in dump phase");
+  if (_not_found_class_table != NULL) {
+    _not_found_class_table->reorder_not_found_class_table_for_sharing();
+  }
+}
 #endif
 
 size_t SystemDictionary::count_bytes_for_buckets() {
@@ -3001,6 +3020,30 @@ void SystemDictionary::copy_buckets(char* top, char* end) {
 
 void SystemDictionary::copy_table(char* top, char* end) {
   ClassLoaderData::the_null_class_loader_data()->dictionary()->copy_table(top, end);
+}
+
+size_t SystemDictionary::count_bytes_for_not_found_class_buckets() {
+  assert(DumpSharedSpaces, "must be in dump phase");
+  return _not_found_class_table != NULL ? _not_found_class_table->count_bytes_for_buckets() : 0;
+}
+
+size_t SystemDictionary::count_bytes_for_not_found_class_table() {
+  assert(DumpSharedSpaces, "must be in dump phase");
+  return _not_found_class_table != NULL ? _not_found_class_table->count_bytes_for_table() : 0;
+}
+
+void SystemDictionary::copy_not_found_class_buckets(char* top, char* end) {
+  assert(DumpSharedSpaces, "must be in dump phase");
+  if (_not_found_class_table != NULL) {
+    _not_found_class_table->copy_buckets(top, end);
+  }
+}
+
+void SystemDictionary::copy_not_found_class_table(char* top, char* end) {
+  assert(DumpSharedSpaces, "must be in dump phase");
+  if (_not_found_class_table != NULL) {
+    _not_found_class_table->copy_table(top, end);
+  }
 }
 
 // ----------------------------------------------------------------------------

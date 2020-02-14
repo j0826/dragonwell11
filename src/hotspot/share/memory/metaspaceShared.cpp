@@ -1276,6 +1276,9 @@ public:
     }
     FileMapInfo::metaspace_pointers_do(it);
     SystemDictionary::classes_do(it);
+    if (NotFoundClassOpt && SystemDictionary::not_found_class_table()) {
+      SystemDictionary::not_found_class_table()->metaspace_pointers_do(it);
+    }
     Universe::metaspace_pointers_do(it);
     SymbolTable::metaspace_pointers_do(it);
     vmSymbols::metaspace_pointers_do(it);
@@ -1312,6 +1315,9 @@ char* VM_PopulateDumpSharedSpace::dump_read_only_tables() {
   // Reorder the system dictionary. Moving the symbols affects
   // how the hash table indices are calculated.
   SystemDictionary::reorder_dictionary_for_sharing();
+  if (NotFoundClassOpt) {
+    SystemDictionary::reorder_not_found_class_table_for_sharing();
+  }
 
   tty->print("Removing java_mirror ... ");
   if (!MetaspaceShared::is_heap_object_archiving_allowed()) {
@@ -1328,6 +1334,20 @@ char* VM_PopulateDumpSharedSpace::dump_read_only_tables() {
   size_t table_bytes = SystemDictionary::count_bytes_for_table();
   char* table_top = _ro_region.allocate(table_bytes, sizeof(intptr_t));
   SystemDictionary::copy_table(table_top, _ro_region.top());
+
+  size_t not_found_class_buckets_bytes = SystemDictionary::count_bytes_for_not_found_class_buckets();
+  if (not_found_class_buckets_bytes != 0) {
+    char* not_found_class_buckets_top = _ro_region.allocate(not_found_class_buckets_bytes, sizeof(intptr_t));
+    SystemDictionary::copy_not_found_class_buckets(not_found_class_buckets_top, _ro_region.top());
+    size_t not_found_class_table_bytes = SystemDictionary::count_bytes_for_not_found_class_table();
+    char* not_found_class_table_top = _ro_region.allocate(not_found_class_table_bytes, sizeof(intptr_t));
+    SystemDictionary::copy_not_found_class_table(not_found_class_table_top, _ro_region.top());
+  } else {
+    char* not_found_class_buckets_top = _ro_region.allocate(2 * sizeof(intptr_t), sizeof(intptr_t));
+    *(intptr_t*)(not_found_class_buckets_top) = 0;
+    not_found_class_buckets_top += sizeof(intptr_t);
+    *(intptr_t*)(not_found_class_buckets_top) = 0;
+  }
 
   // Write the archived object sub-graph infos. For each klass with sub-graphs,
   // the info includes the static fields (sub-graph entry points) and Klasses
@@ -2152,6 +2172,23 @@ void MetaspaceShared::initialize_shared_spaces() {
   int len = *(intptr_t*)buffer;     // skip over shared dictionary entries
   buffer += sizeof(intptr_t);
   buffer += len;
+
+  int notFoundTableLen = *(intptr_t*)buffer;
+  buffer += sizeof(intptr_t);
+  number_of_entries = *(intptr_t*)buffer;
+  buffer += sizeof(intptr_t);
+  if (notFoundTableLen != 0) {
+    SystemDictionary::set_not_found_class_table((HashtableBucket<mtSymbol>*)buffer,
+                                                sharedDictionaryLen,
+                                                number_of_entries);
+    buffer += notFoundTableLen;
+    // The following data are the linked list elements
+    // (HashtableEntry objects) for the not found table.
+
+    int len = *(intptr_t*)buffer;     // skip over shared dictionary entries
+    buffer += sizeof(intptr_t);
+    buffer += len;
+  }
 
   // The table of archived java heap object sub-graph infos
   buffer = HeapShared::read_archived_subgraph_infos(buffer);

@@ -271,7 +271,7 @@ private:
     // result is used by all threads, and all future queries.
     array->atomic_compare_exchange_oop(index, o, NULL);
   }
-  static bool check_class_not_found(const Symbol *class_name, int hash_value, TRAPS);
+  static bool check_not_found_class(Symbol *class_name, int hash_value);
   static InstanceKlass* load_class_from_cds(const Symbol* class_name, Handle class_loader, InstanceKlass* ik, int hash, TRAPS);
 
   static oop shared_protection_domain(int index);
@@ -331,6 +331,8 @@ public:
 
   static void add_non_builtin_klass(Symbol* class_name, ClassLoaderData* loader_data,
                                     InstanceKlass* k, int initiating_loader_hash, TRAPS);
+
+  static void record_not_found_class(Symbol* class_name, int hash_value);
   static Klass* dump_time_resolve_super_or_fail(Symbol* child_name,
                                                 Symbol* class_name,
                                                 Handle class_loader,
@@ -381,7 +383,7 @@ public:
                                            const ClassFileStream* st,
                                            TRAPS);
 
-  static InstanceKlass* lookup_shared(const Symbol* class_name, Handle class_loader,
+  static InstanceKlass* lookup_shared(Symbol* class_name, Handle class_loader,
                                       bool& not_found, bool check_not_found, TRAPS);
 
   static InstanceKlass* define_class_from_cds(InstanceKlass *ik,
