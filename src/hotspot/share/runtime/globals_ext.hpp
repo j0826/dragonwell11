@@ -86,6 +86,10 @@
                                                                             \
   experimental(bool, EagerAppCDSLegacyVerisonSupport, false,                \
           "dump the classes which is compiled JDK1.5 or below")             \
+                                                                            \
+  product(double, ZHighUsagePercent, 95.0,                                  \
+          "Percentage of heap usage for ZGC high usage rule")               \
+
   //add new AJDK specific flags here
 
 

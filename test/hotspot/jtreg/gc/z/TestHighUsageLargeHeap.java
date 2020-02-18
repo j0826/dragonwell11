@@ -28,7 +28,7 @@ package gc.z;
  * @requires vm.gc.Z & !vm.graal.enabled
  * @summary Test ZGC "High Usage" rule
  * @library /test/lib
- * @run main/othervm gc.z.TestHighUsageLargeHeap
+ * @run main/othervm/timeout=600 gc.z.TestHighUsageLargeHeap
  */
 
 import java.util.LinkedList;
@@ -41,13 +41,16 @@ public class TestHighUsageLargeHeap {
         private static final int M = K * K;
         private static final long MAX_CAPACITY = Runtime.getRuntime().maxMemory();
         private static final long SLOW_ALLOCATION_THRESHOLD = 256 * M;
-        private static final long HIGH_USAGE_THRESHOLD = MAX_CAPACITY / 20; // 5%
         private static volatile LinkedList<byte[]> keepAlive;
         private static volatile Object dummy;
 
         public static void main(String[] args) throws Exception {
+            long highUsageThreshold = MAX_CAPACITY / 20; // 5%
+            if (args.length > 0) {
+                highUsageThreshold = (long)(MAX_CAPACITY * (1.0 - Double.valueOf(args[0]) / 100.0));
+            }
             System.out.println("Max capacity: " + (MAX_CAPACITY / M) + "M");
-            System.out.println("High usage threshold: " + (HIGH_USAGE_THRESHOLD / M) + "M");
+            System.out.println("High usage threshold: " + (highUsageThreshold / M) + "M");
             System.out.println("Allocating live-set");
 
             // Allocate live-set
@@ -69,7 +72,7 @@ public class TestHighUsageLargeHeap {
             // usage threshold we idle to allow for a "High Usage" GC cycle to happen.
             // We need to allocate slowly to avoid an "Allocation Rate" GC cycle.
             for (int i = 0; i < 300; i++) {
-                if (Runtime.getRuntime().freeMemory() > HIGH_USAGE_THRESHOLD) {
+                if (Runtime.getRuntime().freeMemory() > highUsageThreshold) {
                     // Allocate
                     dummy = new byte[2 * M];
                     System.out.println("Free: " + (Runtime.getRuntime().freeMemory() / M) + "M (Allocating)");
@@ -96,6 +99,22 @@ public class TestHighUsageLargeHeap {
                                                   "-XX:ConcGCThreads=1",
                                                   "-Xlog:gc,gc+start",
                                                   Test.class.getName() })
+                    .shouldNotContain("Allocation Stall")
+                    .shouldContain("High Usage")
+                    .shouldHaveExitValue(0);
+
+        ProcessTools.executeTestJvm(new String[]{ "-XX:+UnlockExperimentalVMOptions",
+                                                  "-XX:+UseZGC",
+                                                  "-XX:+UnlockDiagnosticVMOptions",
+                                                  "-XX:-ZProactive",
+                                                  "-Xms2G",
+                                                  "-Xmx2G",
+                                                  "-XX:ParallelGCThreads=1",
+                                                  "-XX:ConcGCThreads=1",
+                                                  "-XX:ZHighUsagePercent=85.0",
+                                                  "-Xlog:gc,gc+start",
+                                                  Test.class.getName(),
+                                                  "85.0" })
                     .shouldNotContain("Allocation Stall")
                     .shouldContain("High Usage")
                     .shouldHaveExitValue(0);
