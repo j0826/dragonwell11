@@ -681,7 +681,16 @@ inline bool ConcurrentHashTable<VALUE, CONFIG, F>::
         // Keep in odd list
         odd = aux->next_ptr();
       } else {
-        fatal("aux_index does not match even or odd indices");
+        if (CONFIG::should_skip_wrong_index()) {
+          delete_me = aux;
+          // This item is dead, move both list to next
+          new_table->get_bucket(odd_index)->release_assign_node_ptr(odd,
+                                                                    aux_next);
+          new_table->get_bucket(even_index)->release_assign_node_ptr(even,
+                                                                     aux_next);
+        } else {
+          fatal("aux_index does not match even or odd indices");
+        }
       }
     }
     aux = aux_next;

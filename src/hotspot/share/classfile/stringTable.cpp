@@ -110,6 +110,13 @@ class StringTableConfig : public StringTableHash::BaseConfig {
     StringTableHash::BaseConfig::free_node(memory, value);
     StringTable::item_removed();
   }
+
+  static bool should_skip_wrong_index() {
+    if (IgnoreInvalidEntryAtStringTableExpansion) {
+      log_trace(stringtable)("An invalid node is found");
+    }
+    return IgnoreInvalidEntryAtStringTableExpansion;
+  }
 };
 
 class StringTableLookupJchar : StackObj {

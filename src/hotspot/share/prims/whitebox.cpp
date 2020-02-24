@@ -1274,6 +1274,11 @@ WB_ENTRY(jboolean, WB_IsInStringTable(JNIEnv* env, jobject o, jstring javaString
   return (StringTable::lookup(name, len) != NULL);
 WB_END
 
+WB_ENTRY(void, WB_GrowStringTable(JNIEnv* env, jobject o))
+    JavaThread* t = JavaThread::current();
+    StringTable::the_table()->grow(t);
+WB_END
+
 WB_ENTRY(void, WB_FullGC(JNIEnv* env, jobject o))
   Universe::heap()->soft_ref_policy()->set_should_clear_all_soft_refs(true);
   Universe::heap()->collect(GCCause::_wb_full_gc);
@@ -2162,6 +2167,7 @@ static JNINativeMethod methods[] = {
   {CC"getStringVMFlag",    CC"(Ljava/lang/String;)Ljava/lang/String;",
                                                       (void*)&WB_GetStringVMFlag},
   {CC"isInStringTable",    CC"(Ljava/lang/String;)Z", (void*)&WB_IsInStringTable  },
+  {CC"growStringTable",    CC"()V",                   (void*)&WB_GrowStringTable  },
   {CC"fullGC",   CC"()V",                             (void*)&WB_FullGC },
   {CC"youngGC",  CC"()V",                             (void*)&WB_YoungGC },
   {CC"readReservedMemory", CC"()V",                   (void*)&WB_ReadReservedMemory },

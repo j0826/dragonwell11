@@ -503,6 +503,10 @@ class ConcurrentHashTable : public CHeapObj<F> {
     static void* allocate_node(size_t size, const VALUE& value);
     // Default node reclamation.
     static void free_node(void* memory, const VALUE& value);
+    // For wrong index, whether it need skip the node with wrong index
+    static bool should_skip_wrong_index() {
+      return false;
+    }
   };
 
   // Scoped multi getter.

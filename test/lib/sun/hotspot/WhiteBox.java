@@ -372,6 +372,7 @@ public class WhiteBox {
 
   // Intered strings
   public native boolean isInStringTable(String str);
+  public native void growStringTable();
 
   // Memory
   public native void readReservedMemory();

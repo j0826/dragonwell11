@@ -89,6 +89,9 @@
                                                                             \
   product(double, ZHighUsagePercent, 95.0,                                  \
           "Percentage of heap usage for ZGC high usage rule")               \
+                                                                            \
+  product(bool, IgnoreInvalidEntryAtStringTableExpansion, true,             \
+          "ignore invalid node in StringTable when growing")                \
 
   //add new AJDK specific flags here
 

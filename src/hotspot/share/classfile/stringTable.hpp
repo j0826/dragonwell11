@@ -51,7 +51,6 @@ class StringTable : public CHeapObj<mtSymbol>{
   friend class StringTableCreateEntry;
 
 private:
-  void grow(JavaThread* jt);
   void clean_dead_entries(JavaThread* jt);
 
   // The string table
@@ -109,6 +108,7 @@ private:
     _the_table = new StringTable();
   }
 
+  void grow(JavaThread* jt);
   static void do_concurrent_work(JavaThread* jt);
   static bool has_work() { return the_table()->_has_work; }
 
