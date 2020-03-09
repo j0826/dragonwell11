@@ -92,6 +92,11 @@
                                                                             \
   product(bool, IgnoreInvalidEntryAtStringTableExpansion, true,             \
           "ignore invalid node in StringTable when growing")                \
+                                                                            \
+  manageable(bool, PrintCodeCacheFlushStackTrace, false,                    \
+          "Print stack trace when code cache flushing occurred due to "     \
+          "class re-definition")                                            \
+                                                                            \
 
   //add new AJDK specific flags here
 

@@ -3859,9 +3859,15 @@ void VM_RedefineClasses::flush_dependent_code(InstanceKlass* ik, TRAPS) {
   if (JvmtiExport::all_dependencies_are_recorded()) {
     CodeCache::flush_evol_dependents_on(ik);
   } else {
+    ResourceMark rm(THREAD);
+    warning("Code cache is flushed due to class re-definition: %s. %s",
+            ik->name()->as_C_string(),
+            PrintCodeCacheFlushStackTrace ? "" : "Use -XX:+PrintCodeCacheFlushStackTrace to see the stack trace. ");
+    if (PrintCodeCacheFlushStackTrace) {
+      print_code_cache_flush_stack_trace();
+    }
     CodeCache::mark_all_nmethods_for_deoptimization();
 
-    ResourceMark rm(THREAD);
     DeoptimizationMarker dm;
 
     // Deoptimize all activations depending on marked nmethods
@@ -3872,6 +3878,23 @@ void VM_RedefineClasses::flush_dependent_code(InstanceKlass* ik, TRAPS) {
 
     // From now on we know that the dependency information is complete
     JvmtiExport::set_all_dependencies_are_recorded(true);
+  }
+}
+
+void VM_RedefineClasses::print_code_cache_flush_stack_trace() {
+  assert(ThreadLocalStorage::thread()->is_VM_thread(), "sanity");
+  JavaThread* p = JavaThread::active();
+  assert(p->thread_state() == _thread_blocked, "sanity");
+  tty->print("For thread: ");
+  p->print();
+  tty->cr();
+
+  if (p->has_last_Java_frame()) {
+    // If the last_Java_fp is set we are in C land and
+    // can call the standard stack_trace function.
+    p->print_stack();
+  } else {
+    tty->print_cr("Cannot find the last Java frame, printing stack disabled.");
   }
 }
 

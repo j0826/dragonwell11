@@ -494,6 +494,8 @@ class VM_RedefineClasses: public VM_Operation {
          constantPoolHandle scratch_cp, int scratch_cp_length, TRAPS);
 
   void flush_dependent_code(InstanceKlass* ik, TRAPS);
+  // Print stack trace when code cache flushing occurred due to class re-definition
+  static void print_code_cache_flush_stack_trace();
 
   // lock classes to redefine since constant pool merging isn't thread safe.
   void lock_classes();
