@@ -1044,7 +1044,7 @@ bool ClassLoaderDataGraph::_metaspace_oom = false;
 
 // Add a new class loader data node to the list.  Assign the newly created
 // ClassLoaderData into the java/lang/ClassLoader object as a hidden field
-ClassLoaderData* ClassLoaderDataGraph::add_to_graph(Handle loader, bool is_anonymous) {
+ClassLoaderData* ClassLoaderDataGraph::add_to_graph(Handle loader, bool is_anonymous, bool& is_created) {
   NoSafepointVerifier no_safepoints; // we mustn't GC until we've installed the
                                      // ClassLoaderData in the graph since the CLD
                                      // contains oops in _handles that must be walked.
@@ -1059,6 +1059,7 @@ ClassLoaderData* ClassLoaderDataGraph::add_to_graph(Handle loader, bool is_anony
       // Returns the data.
       return old;
     }
+    is_created = true;
   }
 
   // We won the race, and therefore the task of adding the data to the list of
@@ -1085,11 +1086,16 @@ ClassLoaderData* ClassLoaderDataGraph::add_to_graph(Handle loader, bool is_anony
 }
 
 ClassLoaderData* ClassLoaderDataGraph::add(Handle loader, bool is_anonymous) {
-  ClassLoaderData* loader_data = add_to_graph(loader, is_anonymous);
+  bool created_by_current_thread = false;
+  ClassLoaderData* loader_data = add_to_graph(loader, is_anonymous, created_by_current_thread);
   // Initialize _name and _name_and_id after the loader data is added to the
   // CLDG because adding the Symbol for _name and _name_and_id might safepoint.
   if (loader.not_null()) {
     loader_data->initialize_name(loader);
+  }
+  if (created_by_current_thread && !loader_data->is_builtin_class_loader_data() && JvmtiExport::should_post_first_class_load_prepare()) {
+    Thread* thread = Thread::current();
+    JvmtiExport::post_first_class_load_prepare((JavaThread *) thread, loader);
   }
   return loader_data;
 }
