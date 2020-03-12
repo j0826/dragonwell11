@@ -97,6 +97,11 @@
           "Print stack trace when code cache flushing occurred due to "     \
           "class re-definition")                                            \
                                                                             \
+  product(bool, JFREnableEarlyNativeEventSupport, false,                    \
+          "Enable early native events support")                             \
+                                                                            \
+  notproduct(bool, TestJFREnableEarlyNativeEventSupport, true,              \
+          "Test early native events support")                               \
 
   //add new AJDK specific flags here
 

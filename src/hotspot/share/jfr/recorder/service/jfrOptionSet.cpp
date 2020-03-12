@@ -313,6 +313,19 @@ jboolean JfrOptionSet::_sample_protection = JNI_FALSE;
 jboolean JfrOptionSet::_sample_protection = JNI_TRUE;
 #endif
 
+bool JfrOptionSet::initialize_for_early_native_event(Thread* thread) {
+  assert(JFREnableEarlyNativeEventSupport, "sanity check");
+  bool result = JfrOptionSet::initialize(thread);
+  if (result) {
+    set_num_global_buffers(_dcmd_numglobalbuffers.value());
+    set_memory_size(_dcmd_memorysize.value()._size);
+    set_global_buffer_size(_dcmd_globalbuffersize.value()._size);
+    set_thread_buffer_size(_dcmd_threadbuffersize.value()._size);
+    set_stackdepth(_dcmd_stackdepth.value());
+  }
+  return result;
+}
+
 bool JfrOptionSet::initialize(Thread* thread) {
   register_parser_options();
   if (!parse_flight_recorder_options_internal(thread)) {

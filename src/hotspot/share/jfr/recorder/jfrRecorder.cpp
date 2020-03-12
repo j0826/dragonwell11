@@ -190,7 +190,7 @@ bool JfrRecorder::on_vm_start() {
     return true;
   }
   Thread* const thread = Thread::current();
-  if (!JfrOptionSet::initialize(thread)) {
+  if (!JFREnableEarlyNativeEventSupport && !JfrOptionSet::initialize(thread)) {
     return false;
   }
   if (!register_jfr_dcmds()) {
@@ -285,6 +285,33 @@ bool JfrRecorder::create_components() {
   return true;
 }
 
+bool JfrRecorder::create_components_for_early_native_event(Thread* thread) {
+  assert(JFREnableEarlyNativeEventSupport, "sanity check");
+
+  if (!JfrOptionSet::initialize_for_early_native_event(thread)) {
+    return false;
+  }
+  if (!create_post_box()) {
+    return false;
+  }
+  if (!create_chunk_repository()) {
+    return false;
+  }
+  if (!create_storage()) {
+    return false;
+  }
+  if (!create_checkpoint_manager()) {
+    return false;
+  }
+  if (!create_stacktrace_repository()) {
+    return false;
+  }
+  if (!create_stringpool()) {
+    return false;
+  }
+  return true;
+}
+
 // subsystems
 static JfrJvmtiAgent* _jvmti_agent = NULL;
 static JfrPostBox* _post_box = NULL;
@@ -305,12 +332,18 @@ bool JfrRecorder::create_jvmti_agent() {
 }
 
 bool JfrRecorder::create_post_box() {
+  if (JFREnableEarlyNativeEventSupport && _post_box != NULL) {
+    return true;
+  }
   assert(_post_box == NULL, "invariant");
   _post_box = JfrPostBox::create();
   return _post_box != NULL;
 }
 
 bool JfrRecorder::create_chunk_repository() {
+  if (JFREnableEarlyNativeEventSupport && _repository != NULL) {
+    return true;
+  }
   assert(_repository == NULL, "invariant");
   assert(_post_box != NULL, "invariant");
   _repository = JfrRepository::create(*_post_box);
@@ -324,6 +357,9 @@ bool JfrRecorder::create_os_interface() {
 }
 
 bool JfrRecorder::create_storage() {
+  if (JFREnableEarlyNativeEventSupport && _storage != NULL) {
+    return true;
+  }
   assert(_repository != NULL, "invariant");
   assert(_post_box != NULL, "invariant");
   _storage = JfrStorage::create(_repository->chunkwriter(), *_post_box);
@@ -331,6 +367,9 @@ bool JfrRecorder::create_storage() {
 }
 
 bool JfrRecorder::create_checkpoint_manager() {
+  if (JFREnableEarlyNativeEventSupport && _checkpoint_manager != NULL) {
+    return true;
+  }
   assert(_checkpoint_manager == NULL, "invariant");
   assert(_repository != NULL, "invariant");
   _checkpoint_manager = JfrCheckpointManager::create(_repository->chunkwriter());
@@ -338,12 +377,18 @@ bool JfrRecorder::create_checkpoint_manager() {
 }
 
 bool JfrRecorder::create_stacktrace_repository() {
+  if (JFREnableEarlyNativeEventSupport && _stack_trace_repository != NULL) {
+    return true;
+  }
   assert(_stack_trace_repository == NULL, "invariant");
   _stack_trace_repository = JfrStackTraceRepository::create();
   return _stack_trace_repository != NULL && _stack_trace_repository->initialize();
 }
 
 bool JfrRecorder::create_stringpool() {
+  if (JFREnableEarlyNativeEventSupport && _stringpool != NULL) {
+    return true;
+  }
   assert(_stringpool == NULL, "invariant");
   assert(_repository != NULL, "invariant");
   _stringpool = JfrStringPool::create(_repository->chunkwriter());

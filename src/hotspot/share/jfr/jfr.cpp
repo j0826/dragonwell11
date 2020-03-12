@@ -94,3 +94,20 @@ bool Jfr::on_start_flight_recording_option(const JavaVMOption** option, char* de
 Thread* Jfr::sampler_thread() {
   return JfrThreadSampling::sampler_thread();
 }
+
+void Jfr::enable_early_native_event_support(Thread* thread) {
+  assert(JFREnableEarlyNativeEventSupport, "sanity check");
+  assert(!is_init_completed(), "sanity check");
+  assert(!JfrRecorder::is_created(), "sanity check");
+
+  if (!JfrRecorder::create_components_for_early_native_event(thread)) {
+    vm_exit_during_initialization("Failure when starting JFR enable_early_native_event_support");
+  }
+
+  // Enable native events here since we can't parse .jfc in hotspot
+
+  // This feature is used by UnifiedProfiling,
+  // for test purpose, enable ClassLoad in debug build,
+  // please reserve this action when UnifiedProfiling is disable.
+  DEBUG_ONLY(if (TestJFREnableEarlyNativeEventSupport) { JfrEventSetting::set_enabled(EventClassLoad::eventId, true); })
+}

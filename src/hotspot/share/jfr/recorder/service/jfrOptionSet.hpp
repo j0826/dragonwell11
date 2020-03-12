@@ -50,6 +50,7 @@ class JfrOptionSet : public AllStatic {
   static jboolean _sample_protection;
 
   static bool initialize(Thread* thread);
+  static bool initialize_for_early_native_event(Thread* thread);
   static bool configure(TRAPS);
   static bool adjust_memory_options();
 

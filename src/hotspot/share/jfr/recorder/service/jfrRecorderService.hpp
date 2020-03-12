@@ -42,6 +42,7 @@ class JfrRecorderService : public StackObj {
   JfrStackTraceRepository& _stack_trace_repository;
   JfrStorage& _storage;
   JfrStringPool& _string_pool;
+  bool _skip_clear_for_early_data;
 
   void open_new_chunk(bool vm_error = false);
   void chunk_rotation();

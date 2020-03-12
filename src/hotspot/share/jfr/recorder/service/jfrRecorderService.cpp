@@ -241,7 +241,8 @@ JfrRecorderService::JfrRecorderService() :
   _repository(JfrRepository::instance()),
   _storage(JfrStorage::instance()),
   _stack_trace_repository(JfrStackTraceRepository::instance()),
-  _string_pool(JfrStringPool::instance()) {}
+  _string_pool(JfrStringPool::instance()),
+  _skip_clear_for_early_data(JFREnableEarlyNativeEventSupport) {}
 
 void JfrRecorderService::start() {
   RotationLock rl(Thread::current());
@@ -258,6 +259,11 @@ void JfrRecorderService::start() {
 }
 
 void JfrRecorderService::clear() {
+  if (_skip_clear_for_early_data) {
+    // skip only once
+    _skip_clear_for_early_data = false;
+    return;
+  }
   ResourceMark rm;
   HandleMark hm;
   pre_safepoint_clear();
