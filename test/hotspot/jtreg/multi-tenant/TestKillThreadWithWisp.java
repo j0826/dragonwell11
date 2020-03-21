@@ -12,7 +12,7 @@
 import static jdk.test.lib.Asserts.*;
 import com.alibaba.tenant.TenantConfiguration;
 import com.alibaba.tenant.TenantContainer;
-import com.alibaba.wisp.engine.Wisp2Group;
+import com.alibaba.wisp.engine.WispEngine;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ThreadFactory;
@@ -51,7 +51,7 @@ public class TestKillThreadWithWisp {
         try {
             tenant.run(() -> {
                 CountDownLatch cdl = new CountDownLatch(TASKS_NUM);
-                Wisp2Group delegated = Wisp2Group.createGroup(THREADS_NUM_IN_GROUP, new ThreadFactory() {
+                WispEngine delegated = WispEngine.createEngine(THREADS_NUM_IN_GROUP, new ThreadFactory() {
                     AtomicInteger seq = new AtomicInteger();
                     @Override
                     public Thread newThread(Runnable r) {
