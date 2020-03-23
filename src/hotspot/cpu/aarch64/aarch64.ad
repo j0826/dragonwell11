@@ -128,8 +128,8 @@ reg_def R25     ( SOC, SOE, Op_RegI, 25, r25->as_VMReg()        );
 reg_def R25_H   ( SOC, SOE, Op_RegI, 25, r25->as_VMReg()->next());
 reg_def R26     ( SOC, SOE, Op_RegI, 26, r26->as_VMReg()        );
 reg_def R26_H   ( SOC, SOE, Op_RegI, 26, r26->as_VMReg()->next());
-reg_def R27     (  NS, SOE, Op_RegI, 27, r27->as_VMReg()        ); // heapbase
-reg_def R27_H   (  NS, SOE, Op_RegI, 27, r27->as_VMReg()->next());
+reg_def R27     ( SOC, SOE, Op_RegI, 27, r27->as_VMReg()        ); // heapbase
+reg_def R27_H   ( SOC, SOE, Op_RegI, 27, r27->as_VMReg()->next());
 reg_def R28     (  NS, SOE, Op_RegI, 28, r28->as_VMReg()        ); // thread
 reg_def R28_H   (  NS, SOE, Op_RegI, 28, r28->as_VMReg()->next());
 reg_def R29     (  NS,  NS, Op_RegI, 29, r29->as_VMReg()        ); // fp
@@ -375,7 +375,6 @@ alloc_class chunk0(
     R26, R26_H,
 
     // non-allocatable registers
-
     R27, R27_H, // heapbase
     R28, R28_H, // thread
     R29, R29_H, // fp
@@ -541,7 +540,7 @@ reg_class no_special_reg32_no_fp(
     R23,
     R24,
     R25,
-    R26
+    R26,
  /* R27, */                     // heapbase
  /* R28, */                     // thread
  /* R29, */                     // fp
@@ -574,7 +573,7 @@ reg_class no_special_reg32_with_fp(
     R23,
     R24,
     R25,
-    R26
+    R26,
  /* R27, */                     // heapbase
  /* R28, */                     // thread
     R29,                        // fp
@@ -582,7 +581,75 @@ reg_class no_special_reg32_with_fp(
  /* R31 */                      // sp
 );
 
-reg_class_dynamic no_special_reg32(no_special_reg32_no_fp, no_special_reg32_with_fp, %{ PreserveFramePointer %});
+reg_class no_special_reg32_no_fp_with_heapbase(
+    R0,
+    R1,
+    R2,
+    R3,
+    R4,
+    R5,
+    R6,
+    R7,
+    R10,
+    R11,
+    R12,                        // rmethod
+    R13,
+    R14,
+    R15,
+    R16,
+    R17,
+    R18,
+    R19,
+    R20,
+    R21,
+    R22,
+    R23,
+    R24,
+    R25,
+    R26,
+    R27,                        // heapbase
+ /* R28, */                     // thread
+ /* R29, */                     // fp
+ /* R30, */                     // lr
+ /* R31 */                      // sp
+);
+
+reg_class no_special_reg32_with_fp_with_heapbase(
+    R0,
+    R1,
+    R2,
+    R3,
+    R4,
+    R5,
+    R6,
+    R7,
+    R10,
+    R11,
+    R12,                        // rmethod
+    R13,
+    R14,
+    R15,
+    R16,
+    R17,
+    R18,
+    R19,
+    R20,
+    R21,
+    R22,
+    R23,
+    R24,
+    R25,
+    R26,
+    R27,                        // heapbase
+ /* R28, */                     // thread
+    R29,                        // fp
+ /* R30, */                     // lr
+ /* R31 */                      // sp
+);
+
+reg_class_dynamic no_special_reg32_no_heapbase(no_special_reg32_no_fp, no_special_reg32_with_fp, %{ PreserveFramePointer %});
+reg_class_dynamic no_special_reg32_with_heapbase(no_special_reg32_no_fp_with_heapbase, no_special_reg32_with_fp_with_heapbase, %{ PreserveFramePointer %});
+reg_class_dynamic no_special_reg32(no_special_reg32_no_heapbase, no_special_reg32_with_heapbase, %{ PreserveHeapBase %});
 
 // Class for all non-special long integer registers
 reg_class no_special_reg_no_fp(
@@ -651,7 +718,75 @@ reg_class no_special_reg_with_fp(
  /* R31, R31_H */               // sp
 );
 
-reg_class_dynamic no_special_reg(no_special_reg_no_fp, no_special_reg_with_fp, %{ PreserveFramePointer %});
+reg_class no_special_reg_no_fp_with_heapbase(
+    R0, R0_H,
+    R1, R1_H,
+    R2, R2_H,
+    R3, R3_H,
+    R4, R4_H,
+    R5, R5_H,
+    R6, R6_H,
+    R7, R7_H,
+    R10, R10_H,
+    R11, R11_H,
+    R12, R12_H,                 // rmethod
+    R13, R13_H,
+    R14, R14_H,
+    R15, R15_H,
+    R16, R16_H,
+    R17, R17_H,
+    R18, R18_H,
+    R19, R19_H,
+    R20, R20_H,
+    R21, R21_H,
+    R22, R22_H,
+    R23, R23_H,
+    R24, R24_H,
+    R25, R25_H,
+    R26, R26_H,
+    R27, R27_H,                 // heapbase
+ /* R28, R28_H, */              // thread
+ /* R29, R29_H, */              // fp
+ /* R30, R30_H, */              // lr
+ /* R31, R31_H */               // sp
+);
+
+reg_class no_special_reg_with_fp_with_heapbase(
+    R0, R0_H,
+    R1, R1_H,
+    R2, R2_H,
+    R3, R3_H,
+    R4, R4_H,
+    R5, R5_H,
+    R6, R6_H,
+    R7, R7_H,
+    R10, R10_H,
+    R11, R11_H,
+    R12, R12_H,                 // rmethod
+    R13, R13_H,
+    R14, R14_H,
+    R15, R15_H,
+    R16, R16_H,
+    R17, R17_H,
+    R18, R18_H,
+    R19, R19_H,
+    R20, R20_H,
+    R21, R21_H,
+    R22, R22_H,
+    R23, R23_H,
+    R24, R24_H,
+    R25, R25_H,
+    R26, R26_H,
+    R27, R27_H,                 // heapbase
+ /* R28, R28_H, */              // thread
+    R29, R29_H,                 // fp
+ /* R30, R30_H, */              // lr
+ /* R31, R31_H */               // sp
+);
+
+reg_class_dynamic no_special_reg_no_heapbase(no_special_reg_no_fp, no_special_reg_with_fp, %{ PreserveFramePointer %});
+reg_class_dynamic no_special_reg_with_heapbase(no_special_reg_no_fp_with_heapbase, no_special_reg_with_fp_with_heapbase, %{ PreserveFramePointer %});
+reg_class_dynamic no_special_reg(no_special_reg_no_heapbase, no_special_reg_with_heapbase, %{ PreserveHeapBase %});
 
 // Class for 64 bit register r0
 reg_class r0_reg(
@@ -7242,19 +7377,17 @@ instruct storeN(iRegN src, memory4 mem)
   ins_pipe(istore_reg_mem);
 %}
 
-instruct storeImmN0(iRegIHeapbase heapbase, immN0 zero, memory4 mem)
+instruct storeImmN0(immN0 zero, memory4 mem)
 %{
   match(Set mem (StoreN mem zero));
-  predicate(Universe::narrow_oop_base() == NULL &&
-            Universe::narrow_klass_base() == NULL &&
-            (!needs_releasing_store(n)));
+  predicate(!needs_releasing_store(n));
 
   ins_cost(INSN_COST);
-  format %{ "strw  rheapbase, $mem\t# compressed ptr (rheapbase==0)" %}
+  format %{ "strw  zr, $mem\t# compressed ptr (0)" %}
 
-  ins_encode(aarch64_enc_strw(heapbase, mem));
+  ins_encode(aarch64_enc_strw0(mem));
 
-  ins_pipe(istore_reg_mem);
+  ins_pipe(istore_mem);
 %}
 
 // Store Float

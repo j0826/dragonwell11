@@ -698,6 +698,32 @@ jint universe_init() {
 
   Metaspace::global_initialize();
 
+#ifdef AARCH64
+  // check if we can disable PreserveHeapBase
+  if (!PreserveHeapBase) {
+    if (UseCompressedOops && Universe::narrow_oop_base() != NULL) {
+      log_warning(coops)("PreserveHeapBase must be enabled for non zero heap base");
+      FLAG_SET_DEFAULT(PreserveHeapBase, true);
+    }
+    if (UseCompressedClassPointers) {
+      // in 3 cases we can remove heapbase usage for klass pointer encode
+      // 1) klass base is null
+      // 2) assembler can use xor to encode/decode
+      // 3) the lower 32 bits are 0 and klass shift is 0
+      // check encode_klass_not_null/decode_klass_not_null in macroAssembler_aarch64.cpp
+      if ( Universe::narrow_klass_base() != NULL
+        && !MacroAssembler::can_use_XOR_for_compressed_class_base()
+        && !(((uint64_t)Universe::narrow_klass_base() & 0xffffffff) == 0
+               && Universe::narrow_klass_shift() == 0)
+         ) {
+        log_warning(coops)("PreserveHeapBase must be enabled for klass base");
+        FLAG_SET_DEFAULT(PreserveHeapBase, true);
+      }
+    }
+  }
+  log_debug(coops)("PreserveHeapBase is %s", PreserveHeapBase ? "enabled" : "disabled");
+#endif
+
   // Initialize performance counters for metaspaces
   MetaspaceCounters::initialize_performance_counters();
   CompressedClassSpaceCounters::initialize_performance_counters();

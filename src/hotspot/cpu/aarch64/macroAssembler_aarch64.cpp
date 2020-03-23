@@ -2254,7 +2254,9 @@ void MacroAssembler::subw(Register Rd, Register Rn, RegisterOrConstant decrement
 void MacroAssembler::reinit_heapbase()
 {
   if (UseCompressedOops) {
-    if (Universe::is_fully_initialized()) {
+    if (Universe::is_fully_initialized() && !PreserveHeapBase) {
+      // we do not use heapbase register
+    } else if (Universe::is_fully_initialized()) {
       mov(rheapbase, Universe::narrow_ptrs_base());
     } else {
       lea(rheapbase, ExternalAddress((address)Universe::narrow_ptrs_base_addr()));
@@ -3858,6 +3860,7 @@ void MacroAssembler::encode_klass_not_null(Register dst, Register src) {
   verify_heapbase("MacroAssembler::encode_klass_not_null2: heap base corrupted?");
 #endif
 
+  guarantee(PreserveHeapBase, "heapbase register must be preserved");
   Register rbase = dst;
   if (dst == src) rbase = rheapbase;
   mov(rbase, (uint64_t)Universe::narrow_klass_base());
@@ -3908,6 +3911,7 @@ void  MacroAssembler::decode_klass_not_null(Register dst, Register src) {
   // Cannot assert, unverified entry point counts instructions (see .ad file)
   // vtableStubs also counts instructions in pd_code_size_limit.
   // Also do not verify_oop as this is called by verify_oop.
+  guarantee(PreserveHeapBase, "heapbase register must be preserved");
   if (dst == src) rbase = rheapbase;
   mov(rbase, (uint64_t)Universe::narrow_klass_base());
   if (Universe::narrow_klass_shift() != 0) {

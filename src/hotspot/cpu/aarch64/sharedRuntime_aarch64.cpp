@@ -149,7 +149,7 @@ OopMap* RegisterSaver::save_live_registers(MacroAssembler* masm, int additional_
 
   for (int i = 0; i < RegisterImpl::number_of_registers; i++) {
     Register r = as_Register(i);
-    if (r < rheapbase && r != rscratch1 && r != rscratch2) {
+    if (r <= rfp && r != rscratch1 && r != rscratch2) {
       int sp_offset = 2 * (i + 32); // SP offsets are in 4-byte words,
                                     // register slots are 8 bytes
                                     // wide, 32 floating-point

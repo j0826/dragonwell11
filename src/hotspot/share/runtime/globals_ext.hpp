@@ -122,6 +122,10 @@
   manageable(intx, ArrayAllocationWarningSize, (512*M),                     \
              "Desired size in bytes of array space allocation before "      \
              "printing a warning")                                          \
+                                                                            \
+  AARCH64_ONLY(product(bool, PreserveHeapBase, true,                        \
+          "preserve specific register as heapbase"))                        \
+                                                                            \
 
   //add new AJDK specific flags here
 

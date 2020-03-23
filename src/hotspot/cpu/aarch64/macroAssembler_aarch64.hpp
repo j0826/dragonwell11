@@ -85,10 +85,14 @@ class MacroAssembler: public Assembler {
  public:
   MacroAssembler(CodeBuffer* code) : Assembler(code) {
     use_XOR_for_compressed_class_base
-      = (operand_valid_for_logical_immediate(false /*is32*/,
-                                             (uint64_t)Universe::narrow_klass_base())
-         && ((uint64_t)Universe::narrow_klass_base()
-             > (1UL << log2_intptr(Universe::narrow_klass_range()))));
+      = can_use_XOR_for_compressed_class_base();
+  }
+
+  static bool can_use_XOR_for_compressed_class_base() {
+    return (operand_valid_for_logical_immediate(false /*is32*/,
+                                           (uint64_t)Universe::narrow_klass_base())
+       && ((uint64_t)Universe::narrow_klass_base()
+           > (1UL << log2_intptr(Universe::narrow_klass_range()))));
   }
 
  // These routines should emit JVMTI PopFrame and ForceEarlyReturn handling code.
