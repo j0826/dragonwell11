@@ -38,6 +38,9 @@
 #include "runtime/sharedRuntime.hpp"
 #include "services/memTracker.hpp"
 #include "utilities/macros.hpp"
+#if INCLUDE_JFR
+#include "jfr/jfr.hpp"
+#endif
 
 
 // Initialization done by VM thread in vm_init_globals()
@@ -120,6 +123,13 @@ jint init_globals() {
   templateTable_init();
   InterfaceSupport_init();
   SharedRuntime::generate_stubs();
+
+#ifdef INCLUDE_JFR
+  if (JFREnableEarlyNativeEventSupport) {
+    Jfr::enable_early_native_event_support(JavaThread::current());
+  }
+#endif
+
   universe2_init();  // dependent on codeCache_init and stubRoutines_init1
   javaClasses_init();// must happen after vtable initialization, before referenceProcessor_init
   referenceProcessor_init();

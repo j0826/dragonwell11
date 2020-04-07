@@ -285,6 +285,17 @@ bool JfrRecorder::create_components() {
   return true;
 }
 
+// subsystems
+static JfrJvmtiAgent* _jvmti_agent = NULL;
+static JfrPostBox* _post_box = NULL;
+static JfrStorage* _storage = NULL;
+static JfrCheckpointManager* _checkpoint_manager = NULL;
+static JfrRepository* _repository = NULL;
+static JfrStackTraceRepository* _stack_trace_repository;
+static JfrStringPool* _stringpool = NULL;
+static JfrOSInterface* _os_interface = NULL;
+static JfrThreadSampling* _thread_sampling = NULL;
+
 bool JfrRecorder::create_components_for_early_native_event(Thread* thread) {
   assert(JFREnableEarlyNativeEventSupport, "sanity check");
 
@@ -309,19 +320,9 @@ bool JfrRecorder::create_components_for_early_native_event(Thread* thread) {
   if (!create_stringpool()) {
     return false;
   }
+  _repository->chunkwriter().time_stamp_chunk_now();
   return true;
 }
-
-// subsystems
-static JfrJvmtiAgent* _jvmti_agent = NULL;
-static JfrPostBox* _post_box = NULL;
-static JfrStorage* _storage = NULL;
-static JfrCheckpointManager* _checkpoint_manager = NULL;
-static JfrRepository* _repository = NULL;
-static JfrStackTraceRepository* _stack_trace_repository;
-static JfrStringPool* _stringpool = NULL;
-static JfrOSInterface* _os_interface = NULL;
-static JfrThreadSampling* _thread_sampling = NULL;
 
 bool JfrRecorder::create_java_event_writer() {
   return JfrJavaEventWriter::initialize();

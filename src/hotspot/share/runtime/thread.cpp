@@ -4085,12 +4085,6 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
   // Initialize Java-Level synchronization subsystem
   ObjectMonitor::Initialize();
 
-#ifdef INCLUDE_JFR
-  if (JFREnableEarlyNativeEventSupport) {
-    Jfr::enable_early_native_event_support(main_thread);
-  }
-#endif
-
   // Initialize global modules
   jint status = init_globals();
   if (status != JNI_OK) {

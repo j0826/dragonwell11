@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import jdk.jfr.Recording;
+import jdk.jfr.consumer.RecordedClassLoader;
 import jdk.jfr.consumer.RecordedEvent;
 import jdk.test.lib.Asserts;
 import jdk.test.lib.Platform;
@@ -36,7 +37,10 @@ public class TestEarlyNativeEventSupport {
                 for (RecordedEvent event : events) {
                     Asserts.assertTrue(event.getEventType().getName().equals(EventNames.ClassLoad));
                     System.out.println(event.getClass("loadedClass").getName());
-                    found |= event.getClass("loadedClass").getName().equals("java.lang.Object");
+                    found |= event.getClass("loadedClass").getName().equals("java.lang.Object")
+                             && event.getThread().getId() == 1
+                             && ((RecordedClassLoader)event.getValue("definingClassLoader")).getName().equals("bootstrap")
+                             && ((RecordedClassLoader)event.getValue("initiatingClassLoader")).getName().equals("bootstrap");
                 }
                 Asserts.assertTrue(found);
             } else {
