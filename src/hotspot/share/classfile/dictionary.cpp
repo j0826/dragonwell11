@@ -321,9 +321,7 @@ DictionaryEntry* Dictionary::get_entry(int index, unsigned int hash,
                         entry != NULL;
                         entry = entry->next()) {
     if (entry->hash() == hash && entry->equals(class_name)) {
-      if (!DumpSharedSpaces || SystemDictionaryShared::is_builtin(entry)) {
-        return entry;
-      }
+      return entry;
     }
   }
   return NULL;
