@@ -667,7 +667,7 @@ bool SystemDictionaryShared::check_class_not_found(const Symbol *class_name, int
                          vmSymbols::isNotFound_name(),
                          vmSymbols::isNotFound_signature(),
                          &args,
-                         CHECK_false);
+                         CHECK_AND_CLEAR_false);
 
   return result.get_jboolean();
 }
@@ -700,7 +700,7 @@ InstanceKlass* SystemDictionaryShared::load_class_from_cds(const Symbol* class_n
                           vmSymbols::loadClassFromCDS_name(),
                           vmSymbols::loadClassFromCDS_signature(),
                           &args,
-                          CHECK_NULL);
+                          CHECK_AND_CLEAR_NULL);
 
   oop klass = (oop)result.get_jobject();
   if (klass != NULL) {
