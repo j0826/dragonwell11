@@ -38,6 +38,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.locks.LockSupport;
 
+import com.alibaba.rcm.internal.AbstractResourceContainer;
 import com.alibaba.tenant.TenantContainer;
 import com.alibaba.tenant.TenantDeathException;
 import com.alibaba.tenant.TenantGlobals;
@@ -227,6 +228,17 @@ class Thread implements Runnable {
      * The tenant container which creates this thread object
      */
     TenantContainer inheritedTenantContainer;
+
+    /**
+     * The thread attached {@code ResourceContainer}
+     */
+    AbstractResourceContainer resourceContainer;
+
+    /**
+     * {@code ResourceContainer} inherited from parent
+     */
+    AbstractResourceContainer inheritedResourceContainer;
+
 
     /*
      * indicates whether child thread created by this thread should
@@ -569,6 +581,10 @@ class Thread implements Runnable {
 
         /* Set thread ID */
         this.tid = nextThreadID();
+
+        // com.alibaba.rcm API
+        this.resourceContainer = AbstractResourceContainer.root();
+        this.inheritedResourceContainer = parent.resourceContainer;
 
         /* Set the tenant container */
         if (VM.isBooted() && TenantGlobals.isTenantEnabled()) {
