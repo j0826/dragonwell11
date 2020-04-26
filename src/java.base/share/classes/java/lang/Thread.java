@@ -38,7 +38,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.locks.LockSupport;
 
+import com.alibaba.rcm.ResourceContainer;
 import com.alibaba.rcm.internal.AbstractResourceContainer;
+import com.alibaba.rcm.internal.RCMUnsafe;
 import com.alibaba.tenant.TenantContainer;
 import com.alibaba.tenant.TenantDeathException;
 import com.alibaba.tenant.TenantGlobals;
@@ -584,7 +586,12 @@ class Thread implements Runnable {
 
         // com.alibaba.rcm API
         this.resourceContainer = AbstractResourceContainer.root();
-        this.inheritedResourceContainer = parent.resourceContainer;
+        if (SharedSecrets.getRCMAccess().getResourceContainerInheritancePredicate(
+                parent.resourceContainer).test(this)) {
+            this.inheritedResourceContainer = parent.resourceContainer;
+        } else {
+            this.inheritedResourceContainer = AbstractResourceContainer.root();
+        }
 
         /* Set the tenant container */
         if (VM.isBooted() && TenantGlobals.isTenantEnabled()) {
