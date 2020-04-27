@@ -1101,7 +1101,11 @@ ClassLoaderData* ClassLoaderDataGraph::add(Handle loader, bool is_anonymous) {
   if (loader.not_null()) {
     loader_data->initialize_name(loader);
   }
-  if (created_by_current_thread && !loader_data->is_builtin_class_loader_data() && JvmtiExport::should_post_first_class_load_prepare()) {
+  // post_first_class_load_prepare isn't applied on anonymous class loader,
+  // built-in class loader, reflection class loader
+  if (created_by_current_thread && JvmtiExport::should_post_first_class_load_prepare() &&
+    !loader_data->is_builtin_class_loader_data() &&
+    !java_lang_ClassLoader::is_reflection_class_loader(loader())) {
     Thread* thread = Thread::current();
     JvmtiExport::post_first_class_load_prepare((JavaThread *) thread, loader);
   }
