@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2019 Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -58,6 +58,7 @@ class MemAllocator::Allocation: StackObj {
   void notify_allocation_jvmti_sampler();
   void notify_allocation_low_memory_detector();
   void notify_allocation_jfr_sampler();
+  void notify_allocation_jfr_object_profiling();
   void notify_allocation_dtrace_sampler();
   void check_for_bad_heap_word_value() const;
 #ifdef ASSERT
@@ -152,6 +153,7 @@ void MemAllocator::Allocation::verify_before() {
   assert(!HAS_PENDING_EXCEPTION, "Should not allocate with exception pending");
   debug_only(check_for_valid_allocation_state());
   assert(!Universe::heap()->is_gc_active(), "Allocation during gc not allowed");
+  _allocator.verify_size();
 }
 
 void MemAllocator::Allocation::verify_after() {
@@ -249,6 +251,11 @@ void MemAllocator::Allocation::notify_allocation_jfr_sampler() {
   }
 }
 
+void MemAllocator::Allocation::notify_allocation_jfr_object_profiling() {
+  size_t size_in_bytes = _allocator._word_size * HeapWordSize;
+  CollectedHeap::trace_slow_allocation(_allocator._klass, obj(), size_in_bytes, _thread);
+}
+
 void MemAllocator::Allocation::notify_allocation_dtrace_sampler() {
   if (DTraceAllocProbes) {
     // support for Dtrace object alloc event (no-op most of the time)
@@ -263,6 +270,7 @@ void MemAllocator::Allocation::notify_allocation_dtrace_sampler() {
 void MemAllocator::Allocation::notify_allocation() {
   notify_allocation_low_memory_detector();
   notify_allocation_jfr_sampler();
+  notify_allocation_jfr_object_profiling();
   notify_allocation_dtrace_sampler();
   notify_allocation_jvmti_sampler();
 }
@@ -417,6 +425,28 @@ MemRegion ObjArrayAllocator::obj_memory_range(oop obj) const {
   ArrayKlass* array_klass = ArrayKlass::cast(_klass);
   const size_t hs = arrayOopDesc::header_size(array_klass->element_type());
   return MemRegion(((HeapWord*)obj) + hs, _word_size - hs);
+}
+
+void ObjArrayAllocator::verify_size() const {
+  if ((_word_size << LogBytesPerWord) >= (size_t)ArrayAllocationWarningSize) {
+    //JavaThread::name() may need allocation
+    ResourceMark rm(_thread);
+    //give a warning
+    tty->print_cr("==WARNING==  allocating large array--"            \
+                           "thread_id[" INTPTR_FORMAT "]--"          \
+                           "thread_name[%s]--"                       \
+                           "array_size[" SIZE_FORMAT " bytes]--"     \
+                           "array_length[%d elememts]",
+                           p2i(_thread), _thread->name(),
+                           (size_t)_word_size * HeapWordSize, _length);
+
+    //print stack info
+    _thread->print_on(tty);
+    tty->cr();
+    if (_thread->is_Java_thread()) {
+      ((JavaThread*) _thread)->print_stack_on(tty);
+    }
+  }
 }
 
 oop ObjArrayAllocator::initialize(HeapWord* mem) const {

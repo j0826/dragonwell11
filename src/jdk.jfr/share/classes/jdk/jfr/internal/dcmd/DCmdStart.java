@@ -24,6 +24,7 @@
  */
 package jdk.jfr.internal.dcmd;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
@@ -35,9 +36,11 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
+import jdk.jfr.EventNames;
 import jdk.jfr.FlightRecorder;
 import jdk.jfr.Recording;
 import jdk.jfr.internal.JVM;
+import jdk.jfr.internal.Options;
 import jdk.jfr.internal.LogLevel;
 import jdk.jfr.internal.LogTag;
 import jdk.jfr.internal.Logger;
@@ -105,13 +108,15 @@ final class DCmdStart extends AbstractDCmd {
         if (duration == null && Boolean.FALSE.equals(dumpOnExit) && path != null) {
             throw new DCmdException("Filename can only be set for a time bound recording or if dumponexit=true. Set duration/dumponexit or omit filename.");
         }
-
+        if (settings.length == 1 && settings[0].length() == 0) {
+            throw new DCmdException("No settings specified. Use settings=none to start without any settings");
+        }
         Map<String, String> s = new HashMap<>();
         for (String configName : settings) {
             try {
                 s.putAll(JFC.createKnown(configName).getSettings());
             } catch (IOException | ParseException e) {
-                throw new DCmdException("Could not parse setting " + settings[0], e);
+                throw new DCmdException("Could not parse setting " + configName, e);
             }
         }
 
@@ -145,6 +150,14 @@ final class DCmdStart extends AbstractDCmd {
         }
         recording.setSettings(s);
         SafePath safePath = null;
+
+        if (recording.isRecorderEnabled(EventNames.OptoInstanceObjectAllocation) ||
+            recording.isRecorderEnabled(EventNames.OptoArrayObjectAllocation)) {
+            if (!Options.getSampleObjectAllocations()) {
+                println("Please add -XX:FlightRecorderOptions=sampleobjectallocations=true in JVM options.");
+                return getResult();
+            }
+        }
 
         if (path != null) {
             try {

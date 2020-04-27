@@ -95,6 +95,14 @@ class VectorBoxNode;
 class VectorBoxAllocateNode;
 class VectorUnboxNode;
 
+enum LoopOptsMode {
+  LoopOptsDefault,
+  LoopOptsNone,
+  LoopOptsSkipSplitIf,
+  LoopOptsVerify,
+  LoopOptsLastRound
+};
+
 typedef unsigned int node_idx_t;
 class NodeCloneInfo {
  private:
@@ -508,6 +516,8 @@ class Compile : public Phase {
     PrintInliningBuffer()
       : _cg(NULL) { _ss = new stringStream(); }
 
+    void freeStream() { _ss->~stringStream(); _ss = NULL; }
+
     stringStream* ss() const { return _ss; }
     CallGenerator* cg() const { return _cg; }
     void set_cg(CallGenerator* cg) { _cg = cg; }
@@ -529,6 +539,7 @@ class Compile : public Phase {
 
   void* _replay_inline_data; // Pointer to data loaded from file
 
+  void print_inlining_stream_free();
   void print_inlining_init();
   void print_inlining_reinit();
   void print_inlining_commit();
@@ -1103,6 +1114,7 @@ class Compile : public Phase {
   void inline_incrementally(PhaseIterGVN& igvn);
   void inline_string_calls(bool parse_time);
   void inline_boxing_calls(PhaseIterGVN& igvn);
+  bool optimize_loops(int& loop_opts_cnt, PhaseIterGVN& igvn, LoopOptsMode mode);
 
   void expand_vbox_nodes();
   void expand_vbox_node(VectorBoxNode* vec_box);

@@ -1376,7 +1376,7 @@ public:
   void vpermd(XMMRegister dst, XMMRegister nds, AddressLiteral src, Register scratch_reg);
 
   void vinserti128(XMMRegister dst, XMMRegister nds, XMMRegister src, uint8_t imm8) {
-    if (UseAVX > 2) {
+    if (UseAVX > 2 && VM_Version::supports_avx512novl()) {
       Assembler::vinserti32x4(dst, dst, src, imm8);
     } else if (UseAVX > 1) {
       // vinserti128 is available only in AVX2
@@ -1387,7 +1387,7 @@ public:
   }
 
   void vinserti128(XMMRegister dst, XMMRegister nds, Address src, uint8_t imm8) {
-    if (UseAVX > 2) {
+    if (UseAVX > 2 && VM_Version::supports_avx512novl()) {
       Assembler::vinserti32x4(dst, dst, src, imm8);
     } else if (UseAVX > 1) {
       // vinserti128 is available only in AVX2
@@ -1398,7 +1398,7 @@ public:
   }
 
   void vextracti128(XMMRegister dst, XMMRegister src, uint8_t imm8) {
-    if (UseAVX > 2) {
+    if (UseAVX > 2 && VM_Version::supports_avx512novl()) {
       Assembler::vextracti32x4(dst, src, imm8);
     } else if (UseAVX > 1) {
       // vextracti128 is available only in AVX2
@@ -1409,7 +1409,7 @@ public:
   }
 
   void vextracti128(Address dst, XMMRegister src, uint8_t imm8) {
-    if (UseAVX > 2) {
+    if (UseAVX > 2 && VM_Version::supports_avx512novl()) {
       Assembler::vextracti32x4(dst, src, imm8);
     } else if (UseAVX > 1) {
       // vextracti128 is available only in AVX2
@@ -1434,7 +1434,7 @@ public:
   }
 
   void vinsertf128_high(XMMRegister dst, XMMRegister src) {
-    if (UseAVX > 2) {
+    if (UseAVX > 2 && VM_Version::supports_avx512novl()) {
       Assembler::vinsertf32x4(dst, dst, src, 1);
     } else {
       Assembler::vinsertf128(dst, dst, src, 1);
@@ -1442,7 +1442,7 @@ public:
   }
 
   void vinsertf128_high(XMMRegister dst, Address src) {
-    if (UseAVX > 2) {
+    if (UseAVX > 2 && VM_Version::supports_avx512novl()) {
       Assembler::vinsertf32x4(dst, dst, src, 1);
     } else {
       Assembler::vinsertf128(dst, dst, src, 1);
@@ -1450,7 +1450,7 @@ public:
   }
 
   void vextractf128_high(XMMRegister dst, XMMRegister src) {
-    if (UseAVX > 2) {
+    if (UseAVX > 2 && VM_Version::supports_avx512novl()) {
       Assembler::vextractf32x4(dst, src, 1);
     } else {
       Assembler::vextractf128(dst, src, 1);
@@ -1458,7 +1458,7 @@ public:
   }
 
   void vextractf128_high(Address dst, XMMRegister src) {
-    if (UseAVX > 2) {
+    if (UseAVX > 2 && VM_Version::supports_avx512novl()) {
       Assembler::vextractf32x4(dst, src, 1);
     } else {
       Assembler::vextractf128(dst, src, 1);
@@ -1500,7 +1500,7 @@ public:
   }
 
   void vinsertf128_low(XMMRegister dst, XMMRegister src) {
-    if (UseAVX > 2) {
+    if (UseAVX > 2 && VM_Version::supports_avx512novl()) {
       Assembler::vinsertf32x4(dst, dst, src, 0);
     } else {
       Assembler::vinsertf128(dst, dst, src, 0);
@@ -1508,7 +1508,7 @@ public:
   }
 
   void vinsertf128_low(XMMRegister dst, Address src) {
-    if (UseAVX > 2) {
+    if (UseAVX > 2 && VM_Version::supports_avx512novl()) {
       Assembler::vinsertf32x4(dst, dst, src, 0);
     } else {
       Assembler::vinsertf128(dst, dst, src, 0);
@@ -1516,7 +1516,7 @@ public:
   }
 
   void vextractf128_low(XMMRegister dst, XMMRegister src) {
-    if (UseAVX > 2) {
+    if (UseAVX > 2 && VM_Version::supports_avx512novl()) {
       Assembler::vextractf32x4(dst, src, 0);
     } else {
       Assembler::vextractf128(dst, src, 0);
@@ -1524,7 +1524,7 @@ public:
   }
 
   void vextractf128_low(Address dst, XMMRegister src) {
-    if (UseAVX > 2) {
+    if (UseAVX > 2 && VM_Version::supports_avx512novl()) {
       Assembler::vextractf32x4(dst, src, 0);
     } else {
       Assembler::vextractf128(dst, src, 0);

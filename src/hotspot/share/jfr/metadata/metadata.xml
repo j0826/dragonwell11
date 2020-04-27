@@ -614,6 +614,10 @@
     <Field type="string" name="osVersion" label="OS Version" />
   </Event>
 
+  <Event name="VirtualizationInformation" category="Operating System" label="Virtualization Information" period="endChunk">
+    <Field type="string" name="name" label="Name" />
+  </Event>
+
   <Event name="InitialSystemProperty" category="Java Virtual Machine" label="Initial System Property" description="System Property at JVM start" period="endChunk">
     <Field type="string" name="key" label="Key" />
     <Field type="string" name="value" label="Value" />
@@ -745,8 +749,8 @@
     <Field type="int" name="standardCompileCount" label="Standard Compilations" />
     <Field type="ulong" contentType="bytes" name="osrBytesCompiled" label="OSR Bytes Compiled" />
     <Field type="ulong" contentType="bytes" name="standardBytesCompiled" label="Standard Bytes Compiled" />
-    <Field type="ulong" contentType="bytes" name="nmetodsSize" label="Compilation Resulting Size" />
-    <Field type="ulong" contentType="bytes" name="nmetodCodeSize" label="Compilation Resulting Code Size" />
+    <Field type="ulong" contentType="bytes" name="nmethodsSize" label="Compilation Resulting Size" />
+    <Field type="ulong" contentType="bytes" name="nmethodCodeSize" label="Compilation Resulting Code Size" />
     <Field type="long" contentType="millis" name="peakTimeSpent" label="Peak Time" />
     <Field type="long" contentType="millis" name="totalTimeSpent" label="Total time" />
   </Event>
@@ -918,6 +922,17 @@
     <Field type="ulong" name="value" label="Value" />
   </Event>
 
+  <Event name="OptoInstanceObjectAllocation" category="Java Virtual Machine, Runtime" label="Opto instance object allocation" description="Allocation by Opto jitted method" thread="true" stackTrace="true" startTime="false">
+    <Field type="Class" name="objectClass" label="Object Class" description="Class of allocated instance object"/>
+    <Field type="ulong" contentType="address" name="address" label="Opto Instance Object Allocation Address" description="Address of allocated instance object"/>
+  </Event>
+
+  <Event name="OptoArrayObjectAllocation" category="Java Virtual Machine, Runtime" label="Opto array object allocation" description="Array Allocation by Opto jitted method" thread="true" stackTrace="true" startTime="false">
+    <Field type="Class" name="objectClass" label="Object Class" description="Class of allocated array object"/>
+    <Field type="ulong" contentType="address" name="address" label="Opto Array Object Allocation Address" description="Address of allocated instance object"/>
+    <Field type="ulong" name="allocationSize" label="Object Size" description="The Array Object Size" />
+  </Event>
+
   <Type name="ZStatisticsCounterType" label="Z Statistics Counter">
     <Field type="string" name="counter" label="Counter" />
   </Type>
@@ -948,6 +963,7 @@
     <Field type="Symbol" name="name" label="Name" />
     <Field type="Package" name="package" label="Package" />
     <Field type="int" name="modifiers" label="Access Modifiers" />
+    <Field type="int" name="objectSize" label="Object Size"/>
   </Type>
 
   <Type name="ClassLoader" label="Java Class Loader">

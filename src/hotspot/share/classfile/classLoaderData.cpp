@@ -777,6 +777,14 @@ ClassLoaderData::~ClassLoaderData() {
     os::free(_app_aot_canonical_lib_name);
     _app_aot_canonical_lib_name = NULL;
   }
+
+  // Decrement refcounts of Symbols if created.
+  if (_name != NULL) {
+    _name->decrement_refcount();
+  }
+  if (_name_and_id != NULL) {
+    _name_and_id->decrement_refcount();
+  }
 }
 
 // Returns true if this class loader data is for the app class loader

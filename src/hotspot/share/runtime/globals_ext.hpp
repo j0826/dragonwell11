@@ -114,6 +114,10 @@
                                                                             \
   notproduct(bool, TestJFREnableEarlyNativeEventSupport, true,              \
           "Test early native events support")                               \
+                                                                            \
+  manageable(intx, ArrayAllocationWarningSize, (512*M),                     \
+             "Desired size in bytes of array space allocation before "      \
+             "printing a warning")                                          \
 
   //add new AJDK specific flags here
 

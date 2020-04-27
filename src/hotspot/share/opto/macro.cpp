@@ -27,6 +27,7 @@
 #include "gc/shared/collectedHeap.inline.hpp"
 #include "libadt/vectset.hpp"
 #include "opto/addnode.hpp"
+#include "opto/divnode.hpp"
 #include "opto/arraycopynode.hpp"
 #include "opto/callnode.hpp"
 #include "opto/castnode.hpp"
@@ -51,6 +52,7 @@
 #if INCLUDE_G1GC
 #include "gc/g1/g1ThreadLocalData.hpp"
 #endif // INCLUDE_G1GC
+#include "jfr/objectprofiler/objectProfiler.hpp"
 
 
 //
@@ -344,6 +346,7 @@ Node* PhaseMacroExpand::make_arraycopy_load(ArrayCopyNode* ac, intptr_t offset, 
   }
   Node* res = NULL;
   if (ac->is_clonebasic()) {
+    assert(ac->in(ArrayCopyNode::Src) != ac->in(ArrayCopyNode::Dest), "clone source equals destination");
     Node* base = ac->in(ArrayCopyNode::Src)->in(AddPNode::Base);
     Node* adr = _igvn.transform(new AddPNode(base, base, MakeConX(offset)));
     const TypePtr* adr_type = _igvn.type(base)->is_ptr()->add_offset(offset);
@@ -351,17 +354,40 @@ Node* PhaseMacroExpand::make_arraycopy_load(ArrayCopyNode* ac, intptr_t offset, 
   } else {
     if (ac->modifies(offset, offset, &_igvn, true)) {
       assert(ac->in(ArrayCopyNode::Dest) == alloc->result_cast(), "arraycopy destination should be allocation's result");
-      uint shift  = exact_log2(type2aelembytes(bt));
-      Node* diff = _igvn.transform(new SubINode(ac->in(ArrayCopyNode::SrcPos), ac->in(ArrayCopyNode::DestPos)));
-#ifdef _LP64
-      diff = _igvn.transform(new ConvI2LNode(diff));
-#endif
-      diff = _igvn.transform(new LShiftXNode(diff, intcon(shift)));
+      uint shift = exact_log2(type2aelembytes(bt));
+      Node* src_pos = ac->in(ArrayCopyNode::SrcPos);
+      Node* dest_pos = ac->in(ArrayCopyNode::DestPos);
+      const TypeInt* src_pos_t = _igvn.type(src_pos)->is_int();
+      const TypeInt* dest_pos_t = _igvn.type(dest_pos)->is_int();
 
-      Node* off = _igvn.transform(new AddXNode(MakeConX(offset), diff));
-      Node* base = ac->in(ArrayCopyNode::Src);
-      Node* adr = _igvn.transform(new AddPNode(base, base, off));
-      const TypePtr* adr_type = _igvn.type(base)->is_ptr()->add_offset(offset);
+      Node* adr = NULL;
+      const TypePtr* adr_type = NULL;
+      if (src_pos_t->is_con() && dest_pos_t->is_con()) {
+        intptr_t off = ((src_pos_t->get_con() - dest_pos_t->get_con()) << shift) + offset;
+        Node* base = ac->in(ArrayCopyNode::Src);
+        adr = _igvn.transform(new AddPNode(base, base, MakeConX(off)));
+        adr_type = _igvn.type(base)->is_ptr()->add_offset(off);
+        if (ac->in(ArrayCopyNode::Src) == ac->in(ArrayCopyNode::Dest)) {
+          // Don't emit a new load from src if src == dst but try to get the value from memory instead
+          return value_from_mem(ac->in(TypeFunc::Memory), ctl, ft, ftype, adr_type->isa_oopptr(), alloc);
+        }
+      } else {
+        Node* diff = _igvn.transform(new SubINode(ac->in(ArrayCopyNode::SrcPos), ac->in(ArrayCopyNode::DestPos)));
+#ifdef _LP64
+        diff = _igvn.transform(new ConvI2LNode(diff));
+#endif
+        diff = _igvn.transform(new LShiftXNode(diff, intcon(shift)));
+
+        Node* off = _igvn.transform(new AddXNode(MakeConX(offset), diff));
+        Node* base = ac->in(ArrayCopyNode::Src);
+        adr = _igvn.transform(new AddPNode(base, base, off));
+        adr_type = _igvn.type(base)->is_ptr()->add_offset(Type::OffsetBot);
+        if (ac->in(ArrayCopyNode::Src) == ac->in(ArrayCopyNode::Dest)) {
+          // Non constant offset in the array: we can't statically
+          // determine the value
+          return NULL;
+        }
+      }
       res = LoadNode::make(_igvn, ctl, mem, adr, adr_type, type, bt, MemNode::unordered, LoadNode::Pinned);
     }
   }
@@ -489,7 +515,6 @@ Node *PhaseMacroExpand::value_from_mem(Node *sfpt_mem, Node *sfpt_ctl, BasicType
   Node *alloc_mem = alloc->in(TypeFunc::Memory);
   Arena *a = Thread::current()->resource_area();
   VectorSet visited(a);
-
 
   bool done = sfpt_mem == alloc_mem;
   Node *mem = sfpt_mem;
@@ -935,6 +960,7 @@ void PhaseMacroExpand::process_users_of_allocation(CallNode *alloc) {
           }
           k -= (oc2 - use->outcnt());
         }
+        _igvn.remove_dead_node(use);
       } else if (use->is_ArrayCopy()) {
         // Disconnect ArrayCopy node
         ArrayCopyNode* ac = use->as_ArrayCopy();
@@ -1169,14 +1195,21 @@ void PhaseMacroExpand::set_eden_pointers(Node* &eden_top_adr, Node* &eden_end_ad
 }
 
 
-Node* PhaseMacroExpand::make_load(Node* ctl, Node* mem, Node* base, int offset, const Type* value_type, BasicType bt) {
+Node* PhaseMacroExpand::load(Node* ctl, Node* mem, Node* base, int offset, const Type* value_type, BasicType bt, MemNode::MemOrd mo) {
   Node* adr = basic_plus_adr(base, offset);
   const TypePtr* adr_type = adr->bottom_type()->is_ptr();
-  Node* value = LoadNode::make(_igvn, ctl, mem, adr, adr_type, value_type, bt, MemNode::unordered);
+  Node* value = LoadNode::make(_igvn, ctl, mem, adr, adr_type, value_type, bt, mo);
   transform_later(value);
   return value;
 }
 
+Node* PhaseMacroExpand::make_load(Node* ctl, Node* mem, Node* base, int offset, const Type* value_type, BasicType bt) {
+  return load(ctl, mem, base, offset, value_type, bt, MemNode::unordered);
+}
+
+Node* PhaseMacroExpand::make_load_acquire(Node* ctl, Node* mem, Node* base, int offset, const Type* value_type, BasicType bt) {
+  return load(ctl, mem, base, offset, value_type, bt, MemNode::acquire);
+}
 
 Node* PhaseMacroExpand::make_store(Node* ctl, Node* mem, Node* base, int offset, Node* value, BasicType bt) {
   Node* adr = basic_plus_adr(base, offset);
@@ -1528,6 +1561,10 @@ void PhaseMacroExpand::expand_allocate_common(
       }
     }
 
+    if (JfrOptionSet::sample_object_allocations()) {
+      jfr_sample_fast_object_allocation(alloc, fast_oop, fast_oop_ctrl, fast_oop_rawmem);
+    }
+
     if (C->env()->dtrace_extended_probes()) {
       // Slow-path call
       int size = TypeFunc::Parms + 2;
@@ -1711,6 +1748,115 @@ void PhaseMacroExpand::expand_allocate_common(
   transform_later(result_phi_rawmem);
   transform_later(result_phi_i_o);
   // This completes all paths into the result merge point
+}
+
+static jint bottom_java_frame_bci(JVMState* state) {
+  assert(state != NULL, "Invariant");
+
+  JVMState* last = NULL;
+  JVMState* current = state;
+  while (current != NULL) {
+    last = current;
+    current = current->caller();
+  }
+  return last->bci();
+}
+
+//
+// Pseudo code:
+//
+// int alloc_sample_enabled = *(int *)ObjectProfiler::enabled_flag_address();
+// if (alloc_sample_enabled) {
+//   long alloc_count = thread->trace_data()->alloc_count();
+//   long alloc_count_new = alloc_count + 1;
+//   thread->trace_data()->set_alloc_count(alloc_count_new);
+//   long alloc_count_until_sample = thread->trace_data()->alloc_count_until_sample();
+//   if (alloc_count_until_sample == alloc_count_new) {
+//      jfr_fast_object_alloc_C(obj, thread);
+//   }
+// }
+void PhaseMacroExpand::jfr_sample_fast_object_allocation(
+    AllocateNode* alloc, Node* fast_oop,
+    Node*& fast_oop_ctrl, Node*& fast_oop_rawmem) {
+  Node* tls = transform_later(new ThreadLocalNode());
+
+  Node* alloc_sample_enabled_addr = transform_later(ConPNode::make((address) ObjectProfiler::enabled_flag_address()));
+  Node* alloc_sample_enabled = make_load_acquire(fast_oop_ctrl, fast_oop_rawmem, alloc_sample_enabled_addr, 0, TypeInt::INT, T_INT);
+  Node* alloc_sample_enabled_cmp = transform_later(new CmpINode(alloc_sample_enabled, intcon(1)));
+  Node* alloc_sample_enabled_bool = transform_later(new BoolNode(alloc_sample_enabled_cmp, BoolTest::eq));
+  IfNode* alloc_sample_enabled_if = (IfNode*)transform_later(new IfNode(fast_oop_ctrl, alloc_sample_enabled_bool, PROB_MIN, COUNT_UNKNOWN));
+  Node* alloc_sample_enabled_ctrl = transform_later(new IfTrueNode(alloc_sample_enabled_if));
+  Node* alloc_sample_enabled_mem = fast_oop_rawmem;
+  Node* alloc_sample_disabled_ctrl = transform_later(new IfFalseNode(alloc_sample_enabled_if));
+  Node* alloc_sample_disabled_mem = fast_oop_rawmem;
+  Node* alloc_sample_enabled_region = transform_later(new RegionNode(3));
+  Node* alloc_sample_enabled_region_phi_mem = transform_later(new PhiNode(alloc_sample_enabled_region, Type::MEMORY, TypeRawPtr::BOTTOM));
+  enum { enabled_idx = 1,  disabled_idx = 2 };
+
+  // if _enabled then
+  {
+    const int alloc_count_offset = in_bytes(TRACE_THREAD_ALLOC_COUNT_OFFSET);
+    Node* alloc_count = make_load(alloc_sample_enabled_ctrl, alloc_sample_enabled_mem, tls, alloc_count_offset, TypeLong::LONG, T_LONG);
+    Node* alloc_count_new = transform_later(new AddLNode(alloc_count, longcon(1)));
+    alloc_sample_enabled_mem = make_store(alloc_sample_enabled_ctrl, alloc_sample_enabled_mem, tls, alloc_count_offset, alloc_count_new, T_LONG);
+    const int alloc_count_until_sample_offset = in_bytes(TRACE_THREAD_ALLOC_COUNT_UNTIL_SAMPLE_OFFSET);
+    Node* alloc_count_until_sample = make_load(alloc_sample_enabled_ctrl, alloc_sample_enabled_mem, tls, alloc_count_until_sample_offset, TypeLong::LONG, T_LONG);
+    Node* alloc_count_until_sample_cmp = transform_later(new CmpLNode(alloc_count_until_sample, alloc_count_new));
+    Node* alloc_sample_hit_bool = transform_later(new BoolNode(alloc_count_until_sample_cmp, BoolTest::eq));
+    IfNode* alloc_sample_hit_if = (IfNode*)transform_later(new IfNode(alloc_sample_enabled_ctrl, alloc_sample_hit_bool, PROB_MIN, COUNT_UNKNOWN));
+    Node* alloc_sample_hit_ctrl = transform_later(new IfTrueNode(alloc_sample_hit_if));
+    Node* alloc_sample_hit_mem = alloc_sample_enabled_mem;
+    Node* alloc_sample_miss_ctrl = transform_later(new IfFalseNode(alloc_sample_hit_if));
+    Node* alloc_sample_miss_mem = alloc_sample_enabled_mem;
+    Node* alloc_sample_hit_region = transform_later(new RegionNode(3));
+    Node* alloc_sample_hit_region_phi_mem = transform_later(new PhiNode(alloc_sample_hit_region, Type::MEMORY, TypeRawPtr::BOTTOM));
+
+    // if sample_hit then
+    {
+      CallLeafNode *call = new CallLeafNode(OptoRuntime::jfr_fast_object_alloc_Type(),
+                                            CAST_FROM_FN_PTR(address, OptoRuntime::jfr_fast_object_alloc_C),
+                                            "jfr_fast_object_alloc_C",
+                                            TypeRawPtr::BOTTOM);
+      call->init_req(TypeFunc::Parms+0, fast_oop);
+      call->init_req(TypeFunc::Parms+1, intcon(bottom_java_frame_bci(alloc->jvms())));
+      call->init_req(TypeFunc::Parms+2, tls);
+      call->init_req(TypeFunc::Control, alloc_sample_hit_ctrl);
+      call->init_req(TypeFunc::I_O    , top());
+      call->init_req(TypeFunc::Memory , alloc_sample_hit_mem);
+      call->init_req(TypeFunc::ReturnAdr, alloc->in(TypeFunc::ReturnAdr));
+      call->init_req(TypeFunc::FramePtr, alloc->in(TypeFunc::FramePtr));
+      transform_later(call);
+      alloc_sample_hit_ctrl = new ProjNode(call,TypeFunc::Control);
+      transform_later(alloc_sample_hit_ctrl);
+      alloc_sample_hit_mem = new ProjNode(call,TypeFunc::Memory);
+      transform_later(alloc_sample_hit_mem);
+
+      alloc_sample_hit_region->init_req(enabled_idx, alloc_sample_hit_ctrl);
+      alloc_sample_hit_region_phi_mem->init_req(enabled_idx, alloc_sample_hit_mem);
+    }
+
+    {
+      alloc_sample_hit_region->init_req(disabled_idx, alloc_sample_miss_ctrl);
+      alloc_sample_hit_region_phi_mem->init_req(disabled_idx, alloc_sample_miss_mem);
+    }
+
+    {
+      alloc_sample_enabled_ctrl = alloc_sample_hit_region;
+      alloc_sample_enabled_mem = alloc_sample_hit_region_phi_mem;
+    }
+    alloc_sample_enabled_region->init_req(enabled_idx, alloc_sample_enabled_ctrl);
+    alloc_sample_enabled_region_phi_mem->init_req(enabled_idx, alloc_sample_enabled_mem);
+  }
+
+  {
+    alloc_sample_enabled_region->init_req(disabled_idx, alloc_sample_disabled_ctrl);
+    alloc_sample_enabled_region_phi_mem->init_req(disabled_idx, alloc_sample_disabled_mem);
+  }
+
+  {
+    fast_oop_ctrl = alloc_sample_enabled_region;
+    fast_oop_rawmem = alloc_sample_enabled_region_phi_mem;
+  }
 }
 
 

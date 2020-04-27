@@ -1073,7 +1073,6 @@ void nmethod::make_unloaded(oop cause) {
     if (_method->code() == this) {
       _method->clear_code(); // Break a cycle
     }
-    _method = NULL;            // Clear the method of this dead nmethod
   }
 
   // Make the class unloaded - i.e., change state and notify sweeper
@@ -1089,6 +1088,9 @@ void nmethod::make_unloaded(oop cause) {
   Universe::heap()->unregister_nmethod(this);
 
   _state = unloaded;
+
+  // Clear the method of this dead nmethod
+  set_method(NULL);
 
   // Log the unloading.
   log_state_change();

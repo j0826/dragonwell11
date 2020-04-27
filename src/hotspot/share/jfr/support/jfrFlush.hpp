@@ -26,6 +26,8 @@
 #define SHARE_VM_JFR_SUPPORT_JFRFLUSH_HPP
 
 #include "jfr/recorder/storage/jfrBuffer.hpp"
+#include "jfr/recorder/jfrEventSetting.hpp"
+#include "jfr/recorder/stacktrace/jfrStackTraceRepository.hpp"
 #include "jfr/utilities/jfrTypes.hpp"
 #include "memory/allocation.hpp"
 
@@ -43,15 +45,17 @@ class JfrFlush : public StackObj {
 void jfr_conditional_flush(JfrEventId id, size_t size, Thread* t);
 bool jfr_is_event_enabled(JfrEventId id);
 bool jfr_has_stacktrace_enabled(JfrEventId id);
-bool jfr_save_stacktrace(Thread* t);
+bool jfr_save_stacktrace(Thread* t, StackWalkMode mode);
 void jfr_clear_stacktrace(Thread* t);
 
 template <typename Event>
 class JfrConditionalFlush {
+ protected:
+  bool _enabled;
  public:
   typedef JfrBuffer Type;
-  JfrConditionalFlush(Thread* t) {
-    if (jfr_is_event_enabled(Event::eventId)) {
+  JfrConditionalFlush(Thread* t) : _enabled(jfr_is_event_enabled(Event::eventId)) {
+    if (_enabled) {
       jfr_conditional_flush(Event::eventId, sizeof(Event), t);
     }
   }
@@ -63,8 +67,8 @@ class JfrConditionalFlushWithStacktrace : public JfrConditionalFlush<Event> {
   bool _owner;
  public:
   JfrConditionalFlushWithStacktrace(Thread* t) : JfrConditionalFlush<Event>(t), _t(t), _owner(false) {
-    if (Event::has_stacktrace() && jfr_has_stacktrace_enabled(Event::eventId)) {
-      _owner = jfr_save_stacktrace(t);
+    if (this->_enabled && Event::has_stacktrace() && jfr_has_stacktrace_enabled(Event::eventId)) {
+      _owner = jfr_save_stacktrace(t, JfrEventSetting::stack_walk_mode(Event::eventId));
     }
   }
   ~JfrConditionalFlushWithStacktrace() {

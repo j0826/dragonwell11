@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -331,6 +331,7 @@ class HeapDumpDCmd : public DCmdWithParser {
 protected:
   DCmdArgument<char*> _filename;
   DCmdArgument<bool>  _all;
+  DCmdArgument<bool>  _mini_dump;
 public:
   HeapDumpDCmd(outputStream* output, bool heap);
   static const char* name() {
@@ -881,7 +882,7 @@ public:
     return "High: Switches the VM into Java debug mode.";
   }
   static const JavaPermission permission() {
-    JavaPermission p = { "java.lang.management.ManagementPermission", "monitor", NULL };
+    JavaPermission p = { "java.lang.management.ManagementPermission", "control", NULL };
     return p;
   }
   static int num_arguments() { return 0; }

@@ -373,7 +373,7 @@ AC_DEFUN_ONCE([JDKVER_SETUP_JDK_VERSION_NUMBERS],
     elif test "x$with_version_patch" = x; then
       VERSION_PATCH=0
     else
-      JDKVER_CHECK_AND_SET_NUMBER(VERSION_PATCH, $with_version_patch)
+      VERSION_PATCH=$with_version_patch
     fi
   else
     if test "x$NO_DEFAULT_VERSION_PARTS" != xtrue; then
@@ -499,7 +499,8 @@ AC_DEFUN_ONCE([JDKVER_SETUP_JDK_VERSION_NUMBERS],
       [Set vendor version string @<:@not specified@:>@])])
   if test "x$with_vendor_version_string" = xyes; then
     AC_MSG_ERROR([--with-vendor-version-string must have a value])
-  elif [ ! [[ $with_vendor_version_string =~ ^[[:graph:]]*$ ]] ]; then
+  elif [ ! [[ $with_vendor_version_string =~ ^[[:print:]]*$ ]] ]; then
+    # Dragonwell supports white spaces in vendor-version-string
     AC_MSG_ERROR([--with--vendor-version-string contains non-graphical characters: $with_vendor_version_string])
   else
     VENDOR_VERSION_STRING="$with_vendor_version_string"

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -103,6 +103,7 @@ public class WhiteBox {
     return isClassAlive0(name.replace('.', '/'));
   }
   private native boolean isClassAlive0(String name);
+  public  native int getSymbolRefcount(String name);
 
   private native boolean isMonitorInflated0(Object obj);
   public         boolean isMonitorInflated(Object obj) {
@@ -554,4 +555,6 @@ public class WhiteBox {
   // pre-defined method names from C++ class InterpreterRuntime,
   // will be used as argument to `callInterpreterRuntimeEntry(String name)`
   public static final String IRT_ENTRY_NEW_ILLEGAL_MONITOR_STATE_EXCEPTION = "new_illegal_monitor_state_exception";
+  // Number of loaded AOT libraries
+  public native int aotLibrariesCount();
 }

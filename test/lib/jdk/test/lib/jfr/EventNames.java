@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -147,6 +147,7 @@ public class EventNames {
 
     // OS
     public final static String OSInformation = PREFIX + "OSInformation";
+    public final static String VirtualizationInformation = PREFIX + "VirtualizationInformation";
     public final static String CPUInformation = PREFIX + "CPUInformation";
     public final static String CPULoad = PREFIX + "CPULoad";
     public final static String ThreadCPULoad = PREFIX + "ThreadCPULoad";
@@ -179,6 +180,8 @@ public class EventNames {
     public final static String CPUTimeStampCounter = PREFIX + "CPUTimeStampCounter";
     public final static String ActiveRecording = PREFIX + "ActiveRecording";
     public final static String ActiveSetting = PREFIX + "ActiveSetting";
+    public final static String OptoInstanceObjectAllocation = PREFIX + "OptoInstanceObjectAllocation";
+    public final static String OptoArrayObjectAllocation = PREFIX + "OptoArrayObjectAllocation";
 
     public static boolean isGcEvent(EventType et) {
         return et.getCategoryNames().contains(GC_CATEGORY);
