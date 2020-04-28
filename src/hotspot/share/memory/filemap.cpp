@@ -273,8 +273,10 @@ bool SharedClassPathEntry::validate(bool is_class_path) {
     // (no need to invalid the shared archive) because the shared runtime visibility check
     // filters out any archived module classes that do not have a matching runtime
     // module path location.
-    FileMapInfo::fail_continue("Required classpath entry does not exist: %s", name);
-    ok = false;
+    if (!AppCDSClassFingerprintCheck) {
+      FileMapInfo::fail_continue("Required classpath entry does not exist: %s", name);
+      ok = false;
+    }
   } else if (is_dir()) {
     if (!os::dir_is_empty(name)) {
       FileMapInfo::fail_continue("directory is not empty: %s", name);

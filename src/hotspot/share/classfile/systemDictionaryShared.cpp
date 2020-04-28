@@ -489,7 +489,7 @@ InstanceKlass* SystemDictionaryShared::find_or_load_shared_class(
       return NULL;
     }
 
-    if (SystemDictionary::is_system_class_loader(class_loader()) ||
+    if ((SystemDictionary::is_system_class_loader(class_loader()) && !AppCDSClassFingerprintCheck) ||
         SystemDictionary::is_platform_class_loader(class_loader())) {
       // Fix for 4474172; see evaluation for more details
       class_loader = Handle(
@@ -602,6 +602,41 @@ void SystemDictionaryShared::allocate_shared_data_arrays(int size, TRAPS) {
   allocate_shared_jar_manifest_array(size, CHECK);
 }
 
+InstanceKlass* SystemDictionaryShared::lookup_from_stream_for_system_class_loader(const Symbol* class_name,
+                                                          Handle class_loader,
+                                                          Handle protection_domain,
+                                                          const ClassFileStream* cfs,
+                                                          TRAPS) {
+  assert(SystemDictionary::is_system_class_loader(class_loader()), "unexpected class loader");
+  ClassLoaderData* loader_data = ClassLoaderData::class_loader_data(class_loader());
+  Klass* k;
+
+  {
+    int clsfile_size  = cfs->length();
+    int clsfile_crc32 = ClassLoader::crc32(0, (const char*)cfs->buffer(), cfs->length());
+
+    for (SharedDictionaryEntry *entry = shared_dictionary()->get_entry_for_builtin_loader(class_name);
+         entry != NULL; entry = entry->next()) {
+      if (entry->_clsfile_size == clsfile_size && entry->_clsfile_crc32 == clsfile_crc32) {
+        k = entry->literal();
+        InstanceKlass *loaded = acquire_class_for_current_thread(InstanceKlass::cast(k), class_loader,
+                                                                 protection_domain, CHECK_NULL);
+        if (loaded != NULL) {
+          if (log_is_enabled(Trace, class, cds)) {
+            ResourceMark rm;
+            uint64_t fingerprint = (uint64_t(clsfile_size) << 32) | uint64_t(uint32_t(clsfile_crc32));
+            log_trace(class, cds) ("[%s] Successful loading of class %s (" PTR64_FORMAT ") with source %s",
+                                   LOAD_CLASS_DETAIL_TAG, class_name->as_C_string(), fingerprint, cfs->source());
+          }
+          return loaded;
+        }
+      }
+    }
+    return NULL;
+  }
+}
+
+
 // This function is called for loading only UNREGISTERED classes
 InstanceKlass* SystemDictionaryShared::lookup_from_stream(const Symbol* class_name,
                                                           Handle class_loader,
@@ -613,6 +648,9 @@ InstanceKlass* SystemDictionaryShared::lookup_from_stream(const Symbol* class_na
   }
   if (class_name == NULL) {  // don't do this for anonymous classes
     return NULL;
+  }
+  if (AppCDSClassFingerprintCheck && SystemDictionary::is_system_class_loader(class_loader())) {
+    return lookup_from_stream_for_system_class_loader(class_name, class_loader, protection_domain, cfs, THREAD);
   }
   if (class_loader.is_null() ||
       SystemDictionary::is_system_class_loader(class_loader()) ||

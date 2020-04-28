@@ -6243,6 +6243,14 @@ void ClassFileParser::parse_stream(const ClassFileStream* const stream,
             classlist_file->print_cr("%s", _class_name->as_C_string());
             classlist_file->flush();
           }
+          if (AppCDSClassFingerprintCheck && SystemDictionary::is_system_class_loader(_loader_data->class_loader()) &&
+             log_is_enabled(Trace, class, cds)) {
+             int clsfile_size  = stream->length();
+             int clsfile_crc32 = ClassLoader::crc32(0, (const char*)stream->buffer(), stream->length());
+             uint64_t fingerprint = (uint64_t(clsfile_size) << 32) | uint64_t(uint32_t(clsfile_crc32));
+             log_trace(class, cds) ("[%s] Dump class %s (" PTR64_FORMAT ") with source %s", LOAD_CLASS_DETAIL_TAG,
+                                    _class_name->as_C_string(), fingerprint, stream->source());
+          }
         }
       }
     }

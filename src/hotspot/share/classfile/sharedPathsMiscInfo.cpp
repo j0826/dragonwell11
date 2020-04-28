@@ -136,6 +136,10 @@ bool SharedPathsMiscInfo::check() {
     }
     // skip checking the class path(s) which was not referenced during CDS dump
     if ((cur_index <= max_cp_index) || (cur_index >= module_paths_start_index)) {
+      if (AppCDSClassFingerprintCheck && type == APP_PATH) {
+        cur_index++;
+        continue;
+      }
       if (!check(type, path)) {
         if (!PrintSharedArchiveAndExit) {
           return false;

@@ -1115,6 +1115,19 @@ InstanceKlass* SystemDictionary::resolve_from_stream(Symbol* class_name,
                                          NULL, // host_klass
                                          NULL, // cp_patches
                                          CHECK_NULL);
+#if INCLUDE_CDS
+    if (DumpSharedSpaces && AppCDSClassFingerprintCheck && SystemDictionary::is_system_class_loader(class_loader())) {
+      SystemDictionaryShared::set_shared_class_misc_info(k, st, 0, 0);
+      if (log_is_enabled(Trace, class, cds) && st->source() != NULL) {
+        ResourceMark rm(THREAD);
+        int clsfile_size  = st->length();
+        int clsfile_crc32 = ClassLoader::crc32(0, (const char*)st->buffer(), st->length());
+        uint64_t fingerprint = (uint64_t(clsfile_size) << 32) | uint64_t(uint32_t(clsfile_crc32));
+        log_trace(class, cds) ("[%s] Dump class %s (" PTR64_FORMAT ") with source %s", LOAD_CLASS_DETAIL_TAG,
+                               class_name->as_C_string(), fingerprint, st->source());
+      }
+    }
+#endif
   }
 
   assert(k != NULL, "no klass created");

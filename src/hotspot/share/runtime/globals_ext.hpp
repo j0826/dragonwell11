@@ -87,6 +87,10 @@
   experimental(bool, EagerAppCDSLegacyVerisonSupport, false,                \
           "dump the classes which is compiled JDK1.5 or below")             \
                                                                             \
+  product(bool, AppCDSClassFingerprintCheck, false,                         \
+          "Use class fingerprint to do the sanity check for AppCDS "        \
+          "instead of class path")                                          \
+                                                                            \
   product(double, ZHighUsagePercent, 95.0,                                  \
           "Percentage of heap usage for ZGC high usage rule")               \
                                                                             \

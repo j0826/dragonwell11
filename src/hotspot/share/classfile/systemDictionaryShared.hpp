@@ -106,6 +106,7 @@
 ===============================================================================*/
 #define UNREGISTERED_INDEX -9999
 #define NOT_FOUND_CLASS "not.found.class"
+#define LOAD_CLASS_DETAIL_TAG "Load Class Detail Info"
 
 class ClassFileStream;
 
@@ -167,14 +168,13 @@ public:
 };
 
 class SharedDictionary : public Dictionary {
-  SharedDictionaryEntry* get_entry_for_builtin_loader(const Symbol* name) const;
-
   // Convenience functions
   SharedDictionaryEntry* bucket(int index) const {
     return (SharedDictionaryEntry*)(Dictionary::bucket(index));
   }
 
 public:
+  SharedDictionaryEntry* get_entry_for_builtin_loader(const Symbol* name) const;
   SharedDictionaryEntry* get_entry_for_unregistered_loader(const Symbol* name,
                                                            int clsfile_size,
                                                            int clsfile_crc32) const;
@@ -370,6 +370,12 @@ public:
   static void log_not_found_klass(Symbol* name, Handle class_loader, TRAPS);
 
   static InstanceKlass* lookup_from_stream(const Symbol* class_name,
+                                           Handle class_loader,
+                                           Handle protection_domain,
+                                           const ClassFileStream* st,
+                                           TRAPS);
+
+  static InstanceKlass* lookup_from_stream_for_system_class_loader(const Symbol* class_name,
                                            Handle class_loader,
                                            Handle protection_domain,
                                            const ClassFileStream* st,
