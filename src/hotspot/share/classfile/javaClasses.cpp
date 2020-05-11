@@ -4650,9 +4650,7 @@ void JavaClasses::compute_offsets() {
   AbstractAssembler::update_delayed_values();
 
   if (EnableCoroutine) {
-    java_dyn_CoroutineBase::compute_offsets();
-    com_alibaba_wisp_engine_WispCarrier::compute_offsets();
-    com_alibaba_wisp_engine_WispTask::compute_offsets();
+    BASIC_JAVA_CLASSES_DO_PART_COROUTINE(DO_COMPUTE_OFFSETS);
   }
 }
 
@@ -4661,6 +4659,9 @@ void JavaClasses::compute_offsets() {
 
 void JavaClasses::serialize_offsets(SerializeClosure* soc) {
   BASIC_JAVA_CLASSES_DO(DO_SERIALIZE_OFFSETS);
+  if (EnableCoroutine) {
+    BASIC_JAVA_CLASSES_DO_PART_COROUTINE(DO_SERIALIZE_OFFSETS);
+  }
 }
 #endif
 

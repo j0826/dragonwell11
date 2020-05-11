@@ -84,6 +84,12 @@
   f(java_util_concurrent_locks_AbstractOwnableSynchronizer) \
   //end
 
+#define BASIC_JAVA_CLASSES_DO_PART_COROUTINE(f) \
+  f(java_dyn_CoroutineBase) \
+  f(com_alibaba_wisp_engine_WispCarrier) \
+  f(com_alibaba_wisp_engine_WispTask) \
+  //end
+
 #define BASIC_JAVA_CLASSES_DO(f) \
         BASIC_JAVA_CLASSES_DO_PART1(f) \
         BASIC_JAVA_CLASSES_DO_PART2(f)
