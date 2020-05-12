@@ -213,7 +213,7 @@ fi
 
 
 #run test
-VM_OPTS="-XX:+UseAppAOT -XX:+PrintAOT -XX:+PrintCompilation -Xlog:aot*=trace"
+VM_OPTS="-XX:+UseAppAOT -XX:+UnlockExperimentalVMOptions -XX:+PrintAOT -XX:+PrintCompilation -Xlog:aot*=trace"
 VM_OPTS="$VM_OPTS -cp ${MAIN_DIR}"
 ${JAVA} ${VM_OPTS} ${TEST_MAIN_CLASS} > ${TEST_LOG_PATH}
 

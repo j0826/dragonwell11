@@ -117,7 +117,7 @@ then
 fi
 
 #run test
-${JAVA} -XX:+UseAppAOT -XX:+PrintAOT -XX:+PrintCompilation -Xlog:aot*=debug ${TEST_CLASS} >> output.txt
+${JAVA} -XX:+UseAppAOT -XX:+UnlockExperimentalVMOptions -XX:+PrintAOT -XX:+PrintCompilation -Xlog:aot*=debug ${TEST_CLASS} >> output.txt
 
 function check_aotc_log() {
   # check xadd method is compiled

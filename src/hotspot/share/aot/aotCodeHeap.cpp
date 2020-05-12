@@ -823,7 +823,7 @@ bool AOTCodeHeap::load_klass_data(InstanceKlass* ik, Thread* thread) {
 
   // AOT does not support custom class loaders.
   ClassLoaderData* cld = ik->class_loader_data();
-  if (!cld->is_builtin_class_loader_data()) {
+  if (!UseAppAOT && !cld->is_builtin_class_loader_data()) {
     log_trace(aot, class, load)("skip class  %s  for custom classloader %s (%p) tid=" INTPTR_FORMAT,
                                 ik->internal_name(), cld->loader_name(), cld, p2i(thread));
     return false;

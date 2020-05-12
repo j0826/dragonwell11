@@ -127,7 +127,7 @@ then
 fi
 
 #run test
-${JAVA} -XX:+UseAppAOT -XX:-UseOnStackReplacement -XX:+PrintCompilation -XX:+PrintAOT -Xlog:aot*=debug -Dsun.reflect.inflationThreshold=2147483647 ${TEST_CLASS} >> output.txt
+${JAVA} -XX:+UseAppAOT -XX:-UseOnStackReplacement -XX:+PrintCompilation -XX:+UnlockExperimentalVMOptions -XX:+PrintAOT -Xlog:aot*=debug -Dsun.reflect.inflationThreshold=2147483647 ${TEST_CLASS} >> output.txt
 
 function check_aotc_log() {
   # check xadd method is compiled

@@ -122,7 +122,7 @@ then
 fi
 
 #run test
-${JAVA} -XX:+UseAppAOT -XX:+PrintAOT -XX:+PrintCompilation -Xlog:aot*=debug ${TEST_CLASS} >> output.txt 2>&1
+${JAVA} -XX:+UseAppAOT -XX:+UnlockExperimentalVMOptions -XX:+PrintAOT -XX:+PrintCompilation -Xlog:aot*=debug ${TEST_CLASS} >> output.txt 2>&1
 
 function check_output()
 {
