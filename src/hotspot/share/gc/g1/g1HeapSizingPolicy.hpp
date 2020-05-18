@@ -44,6 +44,7 @@ class G1HeapSizingPolicy: public CHeapObj<mtGC> {
   uint _ratio_over_threshold_count;
   double _ratio_over_threshold_sum;
   uint _pauses_since_start;
+  bool _shrink_after_mixed_gc;
 
 
 protected:
@@ -52,10 +53,18 @@ public:
 
   // If an expansion would be appropriate, because recent GC overhead had
   // exceeded the desired limit, return an amount to expand by.
-  virtual size_t expansion_amount();
+  size_t expansion_amount_after_young_collection();
+  size_t shrink_amount_after_mixed_gc(size_t desired_bytes_after_concurrent_mark);
+  size_t shrink_amount_after_concurrent_mark();
+
+  // Calculate the target capacity based on used bytes and free ratio
+  size_t target_heap_capacity(size_t used_bytes, uintx free_ratio) const;
 
   // Clear ratio tracking data used by expansion_amount().
   void clear_ratio_check_data();
+
+  bool shrink_after_mixed_gc() const      { return _shrink_after_mixed_gc; }
+  void set_shrink_after_mixed_gc(bool f)  { _shrink_after_mixed_gc = f; }
 
   static G1HeapSizingPolicy* create(const G1CollectedHeap* g1h, const G1Analytics* analytics);
 };

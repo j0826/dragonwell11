@@ -125,7 +125,7 @@ class G1GCPhaseTimes : public CHeapObj<mtGC> {
   double _cur_derived_pointer_table_update_time_ms;
 
   double _cur_clear_ct_time_ms;
-  double _cur_expand_heap_time_ms;
+  double _cur_resize_heap_time_ms;
   double _cur_ref_proc_time_ms;
   double _cur_ref_enq_time_ms;
 
@@ -225,8 +225,8 @@ class G1GCPhaseTimes : public CHeapObj<mtGC> {
     _cur_clear_ct_time_ms = ms;
   }
 
-  void record_expand_heap_time(double ms) {
-    _cur_expand_heap_time_ms = ms;
+  void record_resize_heap_time(double ms) {
+    _cur_resize_heap_time_ms = ms;
   }
 
   void record_par_time(double ms) {
@@ -340,8 +340,8 @@ class G1GCPhaseTimes : public CHeapObj<mtGC> {
     return _cur_clear_ct_time_ms;
   }
 
-  double cur_expand_heap_time_ms() {
-    return _cur_expand_heap_time_ms;
+  double cur_resize_heap_time_ms() {
+    return _cur_resize_heap_time_ms;
   }
 
   double root_region_scan_wait_time_ms() {

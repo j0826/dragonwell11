@@ -125,7 +125,7 @@ public class TestGCLogMessages {
         // Misc Top-level
         new LogMessageWithLevel("Code Roots Purge", Level.DEBUG),
         new LogMessageWithLevel("String Dedup Fixup", Level.DEBUG),
-        new LogMessageWithLevel("Expand Heap After Collection", Level.DEBUG),
+        new LogMessageWithLevel("Resize Heap After Collection", Level.DEBUG),
         // Free CSet
         new LogMessageWithLevel("Free Collection Set", Level.DEBUG),
         new LogMessageWithLevel("Free Collection Set Serial", Level.TRACE),

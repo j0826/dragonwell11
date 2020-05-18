@@ -35,6 +35,7 @@
 #include "gc/g1/g1Policy.hpp"
 #include "gc/g1/g1SurvivorRegions.hpp"
 #include "gc/g1/g1YoungGenSizer.hpp"
+#include "gc/g1/g1HeapSizingPolicy.hpp"
 #include "gc/g1/heapRegion.inline.hpp"
 #include "gc/g1/heapRegionRemSet.hpp"
 #include "gc/shared/gcPolicyCounters.hpp"
@@ -60,6 +61,7 @@ G1Policy::G1Policy(STWGCTimer* gc_timer) :
   _reserve_regions(0),
   _rs_lengths_prediction(0),
   _bytes_allocated_in_old_since_last_gc(0),
+  _minimum_desired_bytes_after_last_cm(0),
   _initial_mark_to_mixed(),
   _collection_set(NULL),
   _g1h(NULL),
@@ -998,6 +1000,22 @@ void G1Policy::decide_on_conc_mark_initiation() {
   }
 }
 
+void G1Policy::determine_desired_bytes_after_concurrent_mark() {
+  size_t cur_used_bytes = _g1h->non_young_capacity_bytes();
+
+  size_t overall_target_capacity = _g1h->heap_sizing_policy()->target_heap_capacity(cur_used_bytes, MinHeapFreeRatio);
+
+  size_t desired_bytes_after_cm = desired_bytes_after_concurrent_mark(cur_used_bytes);
+
+  _minimum_desired_bytes_after_last_cm = MIN2(desired_bytes_after_cm, overall_target_capacity);
+
+  log_debug(gc, ergo, heap)("After remark used: " SIZE_FORMAT ", "
+                            "minimum_desired_capacity: " SIZE_FORMAT ", desired_bytes_after_concurrent_mark: " SIZE_FORMAT ", "
+                            "minimum_desired_bytes_after_concurrent_mark: " SIZE_FORMAT,
+                            cur_used_bytes, overall_target_capacity, desired_bytes_after_cm,
+                            _minimum_desired_bytes_after_last_cm);
+}
+
 void G1Policy::record_concurrent_mark_cleanup_end() {
   cset_chooser()->rebuild(_g1h->workers(), _g1h->num_regions());
 
@@ -1008,6 +1026,10 @@ void G1Policy::record_concurrent_mark_cleanup_end() {
   }
   collector_state()->set_in_young_gc_before_mixed(mixed_gc_pending);
   collector_state()->set_mark_or_rebuild_in_progress(false);
+
+  if (G1ShrinkAfterMixedGC) {
+    determine_desired_bytes_after_concurrent_mark();
+  }
 
   double end_sec = os::elapsedTime();
   double elapsed_time_ms = (end_sec - _mark_cleanup_start_sec) * 1000.0;
@@ -1100,7 +1122,9 @@ void G1Policy::abort_time_to_mixed_tracking() {
 bool G1Policy::next_gc_should_be_mixed(const char* true_action_str,
                                        const char* false_action_str) const {
   if (cset_chooser()->is_empty()) {
-    log_debug(gc, ergo)("%s (candidate old regions not available)", false_action_str);
+    if (false_action_str != NULL) {
+      log_debug(gc, ergo)("%s (candidate old regions not available)", false_action_str);
+    }
     return false;
   }
 
@@ -1109,12 +1133,16 @@ bool G1Policy::next_gc_should_be_mixed(const char* true_action_str,
   double reclaimable_percent = reclaimable_bytes_percent(reclaimable_bytes);
   double threshold = (double) G1HeapWastePercent;
   if (reclaimable_percent <= threshold) {
-    log_debug(gc, ergo)("%s (reclaimable percentage not over threshold). candidate old regions: %u reclaimable: " SIZE_FORMAT " (%1.2f) threshold: " UINTX_FORMAT,
-                        false_action_str, cset_chooser()->remaining_regions(), reclaimable_bytes, reclaimable_percent, G1HeapWastePercent);
+    if (false_action_str != NULL) {
+      log_debug(gc, ergo)("%s (reclaimable percentage not over threshold). candidate old regions: %u reclaimable: " SIZE_FORMAT " (%1.2f) threshold: " UINTX_FORMAT,
+                          false_action_str, cset_chooser()->remaining_regions(), reclaimable_bytes, reclaimable_percent, G1HeapWastePercent);
+    }
     return false;
   }
-  log_debug(gc, ergo)("%s (candidate old regions available). candidate old regions: %u reclaimable: " SIZE_FORMAT " (%1.2f) threshold: " UINTX_FORMAT,
-                      true_action_str, cset_chooser()->remaining_regions(), reclaimable_bytes, reclaimable_percent, G1HeapWastePercent);
+  if (true_action_str != NULL) {
+    log_debug(gc, ergo)("%s (candidate old regions available). candidate old regions: %u reclaimable: " SIZE_FORMAT " (%1.2f) threshold: " UINTX_FORMAT,
+                        true_action_str, cset_chooser()->remaining_regions(), reclaimable_bytes, reclaimable_percent, G1HeapWastePercent);
+  }
   return true;
 }
 
@@ -1189,4 +1217,14 @@ void G1Policy::transfer_survivors_to_cset(const G1SurvivorRegions* survivors) {
   // at the start of the next.
 
   finished_recalculating_age_indexes(false /* is_survivors */);
+}
+
+size_t G1Policy::desired_bytes_after_concurrent_mark(size_t used_bytes) {
+  size_t minimum_desired_buffer_size = _ihop_control->predict_unrestrained_buffer_size();
+  if (minimum_desired_buffer_size != 0) {
+    return minimum_desired_buffer_size + used_bytes;
+  } else {
+    return _young_list_max_length * HeapRegion::GrainBytes +
+           _reserve_regions * HeapRegion::GrainBytes + used_bytes;
+  }
 }

@@ -1201,7 +1201,12 @@ void G1ConcurrentMark::remark() {
       ClassLoaderDataGraph::purge();
     }
 
-    _g1h->resize_heap_if_necessary();
+    if (G1ShrinkAfterMixedGC) {
+      // With G1ShrinkAfterMixedGC we will not try to expand heap as resize_heap_if_necessary
+      _g1h->shrink_heap_after_concurrent_mark();
+    } else {
+      _g1h->resize_heap_if_necessary();
+    }
 
     compute_new_sizes();
 

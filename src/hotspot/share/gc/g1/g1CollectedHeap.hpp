@@ -73,6 +73,7 @@ class CompactibleSpaceClosure;
 class Space;
 class G1CollectionSet;
 class G1CollectorPolicy;
+class G1HeapSizingPolicy;
 class G1Policy;
 class G1HotCardCache;
 class G1RemSet;
@@ -738,6 +739,10 @@ private:
   // Actually do the work of evacuating the collection set.
   void evacuate_collection_set(G1ParScanThreadStateSet* per_thread_states);
 
+  void resize_heap_after_young_collection();
+  bool expand_heap_after_young_collection();
+  void shrink_heap_after_young_collection();
+
   void pre_evacuate_collection_set();
   void post_evacuate_collection_set(EvacuationInfo& evacuation_info, G1ParScanThreadStateSet* pss);
 
@@ -968,6 +973,8 @@ public:
   const G1CollectionSet* collection_set() const { return &_collection_set; }
   G1CollectionSet* collection_set() { return &_collection_set; }
 
+  G1HeapSizingPolicy* heap_sizing_policy() const { return _heap_sizing_policy; }
+
   virtual CollectorPolicy* collector_policy() const;
 
   virtual SoftRefPolicy* soft_ref_policy();
@@ -1048,7 +1055,7 @@ public:
   inline void old_set_add(HeapRegion* hr);
   inline void old_set_remove(HeapRegion* hr);
 
-  size_t non_young_capacity_bytes() {
+  size_t non_young_capacity_bytes() const {
     return (_old_set.length() + _humongous_set.length()) * HeapRegion::GrainBytes;
   }
 
@@ -1087,6 +1094,8 @@ public:
   inline bool is_in_cset(HeapWord* addr);
 
   inline bool is_in_cset_or_humongous(const oop obj);
+
+  void shrink_heap_after_concurrent_mark();
 
  private:
   // This array is used for a quick test on whether a reference points into

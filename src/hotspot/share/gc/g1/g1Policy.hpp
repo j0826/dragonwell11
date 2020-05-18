@@ -105,7 +105,11 @@ class G1Policy: public CHeapObj<mtGC> {
   // young GC phase.
   size_t _bytes_allocated_in_old_since_last_gc;
 
+  size_t _minimum_desired_bytes_after_last_cm;
+
   G1InitialMarkToMixedTimeTracker _initial_mark_to_mixed;
+
+  void determine_desired_bytes_after_concurrent_mark();
 
   bool should_update_surv_rate_group_predictors() {
     return collector_state()->in_young_only_phase() && !collector_state()->mark_or_rebuild_in_progress();
@@ -338,8 +342,8 @@ public:
     return _bytes_copied_during_gc;
   }
 
-  bool next_gc_should_be_mixed(const char* true_action_str,
-                               const char* false_action_str) const;
+  bool next_gc_should_be_mixed(const char* true_action_str = NULL,
+                               const char* false_action_str = NULL) const;
 
   void finalize_collection_set(double target_pause_time_ms, G1SurvivorRegions* survivor);
 private:
@@ -370,6 +374,8 @@ public:
       _short_lived_surv_rate_group->finished_recalculating_age_indexes();
     }
   }
+
+  size_t desired_bytes_after_concurrent_mark() const { return _minimum_desired_bytes_after_last_cm; }
 
   size_t young_list_target_length() const { return _young_list_target_length; }
 
@@ -424,6 +430,8 @@ public:
   void update_max_gc_locker_expansion();
 
   void update_survivors_policy();
+
+  size_t desired_bytes_after_concurrent_mark(size_t used_bytes);
 };
 
 #endif // SHARE_VM_GC_G1_G1POLICY_HPP

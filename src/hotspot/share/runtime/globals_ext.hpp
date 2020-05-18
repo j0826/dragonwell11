@@ -126,6 +126,8 @@
   AARCH64_ONLY(product(bool, PreserveHeapBase, true,                        \
           "preserve specific register as heapbase"))                        \
                                                                             \
+  product(bool, G1ShrinkAfterMixedGC, false,                                \
+          "Allow to shrink java heap after mixed GC(s)")                    \
 
   //add new AJDK specific flags here
 

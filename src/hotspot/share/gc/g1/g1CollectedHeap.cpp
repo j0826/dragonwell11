@@ -2824,6 +2824,10 @@ G1CollectedHeap::do_collection_pause_at_safepoint(double target_pause_time_ms) {
       // full collection counter.
       increment_old_marking_cycles_started();
       _cm->gc_tracer_cm()->set_gc_cause(gc_cause());
+      if (G1ShrinkAfterMixedGC) {
+        // If shrink doesn't happen, don't need it anymore
+        _heap_sizing_policy->set_shrink_after_mixed_gc(false);
+      }
     }
 
     _gc_tracer_stw->report_yc_type(collector_state()->yc_type());
@@ -2996,8 +3000,10 @@ G1CollectedHeap::do_collection_pause_at_safepoint(double target_pause_time_ms) {
 
         _allocator->init_mutator_alloc_region();
 
-        {
-          size_t expand_bytes = _heap_sizing_policy->expansion_amount();
+        if (G1ShrinkAfterMixedGC) {
+          resize_heap_after_young_collection();
+        } else {
+          size_t expand_bytes = _heap_sizing_policy->expansion_amount_after_young_collection();
           if (expand_bytes > 0) {
             size_t bytes_before = capacity();
             // No need for an ergo logging here,
@@ -3006,7 +3012,7 @@ G1CollectedHeap::do_collection_pause_at_safepoint(double target_pause_time_ms) {
             if (!expand(expand_bytes, _workers, &expand_ms)) {
               // We failed to expand the heap. Cannot do anything about it.
             }
-            g1_policy()->phase_times()->record_expand_heap_time(expand_ms);
+            g1_policy()->phase_times()->record_resize_heap_time(expand_ms);
           }
         }
 
@@ -3097,6 +3103,55 @@ G1CollectedHeap::do_collection_pause_at_safepoint(double target_pause_time_ms) {
   }
 
   return true;
+}
+
+void G1CollectedHeap::resize_heap_after_young_collection() {
+  Ticks start = Ticks::now();
+  if (!expand_heap_after_young_collection()) {
+    // If we don't attempt to expand heap, try if we need to shrink the heap
+    shrink_heap_after_young_collection();
+  }
+  g1_policy()->phase_times()->record_resize_heap_time((Ticks::now() - start).seconds() * 1000.0);
+}
+
+bool G1CollectedHeap::expand_heap_after_young_collection() {
+  size_t expand_bytes = _heap_sizing_policy->expansion_amount_after_young_collection();
+  if (expand_bytes > 0) {
+    // No need for an ergo logging here,
+    // expansion_amount() does this when it returns a value > 0.
+    if (!expand(expand_bytes, _workers, NULL)) {
+      // We failed to expand the heap. Cannot do anything about it.
+    }
+    return true;
+  }
+  return false;
+}
+
+void G1CollectedHeap::shrink_heap_after_young_collection() {
+  assert(G1ShrinkAfterMixedGC, "sanity");
+
+  if (!collector_state()->in_young_only_phase() && !g1_policy()->next_gc_should_be_mixed()) {
+    // Last mixed GC
+    _heap_sizing_policy->set_shrink_after_mixed_gc(true);
+  }
+  if (concurrent_mark()->cm_thread()->during_cycle()) {
+    // Don't shrink during cm cycle because next bitmap may be being cleared
+    return;
+  }
+  if (_heap_sizing_policy->shrink_after_mixed_gc()) {
+    _heap_sizing_policy->set_shrink_after_mixed_gc(false);
+    size_t shrink_bytes = _heap_sizing_policy->shrink_amount_after_mixed_gc(g1_policy()->desired_bytes_after_concurrent_mark());
+    if (shrink_bytes > 0) {
+      shrink(shrink_bytes);
+    }
+  }
+}
+
+void G1CollectedHeap::shrink_heap_after_concurrent_mark() {
+  size_t shrink_bytes = _heap_sizing_policy->shrink_amount_after_concurrent_mark();
+  if (shrink_bytes > 0) {
+    shrink(shrink_bytes);
+  }
 }
 
 void G1CollectedHeap::remove_self_forwarding_pointers() {

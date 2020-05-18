@@ -38,6 +38,7 @@ G1HeapSizingPolicy::G1HeapSizingPolicy(const G1CollectedHeap* g1h, const G1Analy
 
   assert(MinOverThresholdForGrowth < _num_prev_pauses_for_heuristics, "Threshold must be less than %u", _num_prev_pauses_for_heuristics);
   clear_ratio_check_data();
+  _shrink_after_mixed_gc = false;
 }
 
 void G1HeapSizingPolicy::clear_ratio_check_data() {
@@ -46,7 +47,7 @@ void G1HeapSizingPolicy::clear_ratio_check_data() {
   _pauses_since_start = 0;
 }
 
-size_t G1HeapSizingPolicy::expansion_amount() {
+size_t G1HeapSizingPolicy::expansion_amount_after_young_collection() {
   double recent_gc_overhead = _analytics->recent_avg_pause_time_ratio() * 100.0;
   double last_gc_overhead = _analytics->last_pause_time_ratio() * 100.0;
   assert(GCTimeRatio > 0,
@@ -155,4 +156,60 @@ size_t G1HeapSizingPolicy::expansion_amount() {
   }
 
   return expand_bytes;
+}
+
+size_t G1HeapSizingPolicy::target_heap_capacity(size_t used_bytes, uintx free_ratio) const {
+  assert(free_ratio > 0 && free_ratio < 100, "sanity");
+  assert(used_bytes <= _g1h->collector_policy()->max_heap_byte_size(), "sanity");
+
+  const double free_percentage = (double) free_ratio / 100.0;
+  const double used_percentage = 1.0 - free_percentage;
+
+  // We have to be careful here as these two calculations can overflow
+  // 32-bit size_t's.
+  double used_bytes_d = (double) used_bytes;
+  double desired_capacity_d = used_bytes_d / used_percentage;
+  // We can now safely turn it into size_t's.
+  size_t desired_capacity = (size_t) desired_capacity_d;
+
+  const size_t min_heap_size = _g1h->collector_policy()->min_heap_byte_size();
+  const size_t max_heap_size = _g1h->collector_policy()->max_heap_byte_size();
+
+  desired_capacity = MIN2(desired_capacity, max_heap_size);
+  desired_capacity = MAX2(desired_capacity, min_heap_size);
+
+  return desired_capacity;
+}
+
+size_t G1HeapSizingPolicy::shrink_amount_after_mixed_gc(size_t desired_bytes_after_concurrent_mark) {
+  size_t shrink_bytes = 0;
+  const size_t capacity_after_gc = _g1h->capacity();
+  guarantee(capacity_after_gc >= _g1h->unused_committed_regions_in_bytes(), "sanity");
+
+  const size_t used_after_gc = capacity_after_gc - _g1h->unused_committed_regions_in_bytes();
+  size_t maximum_desired_capacity = target_heap_capacity(used_after_gc, MaxHeapFreeRatio);
+  // Make sure not less than _minimum_desired_bytes_after_last_cm
+  maximum_desired_capacity = MAX2(maximum_desired_capacity, desired_bytes_after_concurrent_mark);
+
+  guarantee(maximum_desired_capacity > used_after_gc, "sanity");
+
+  if (capacity_after_gc > maximum_desired_capacity) {
+    shrink_bytes = capacity_after_gc - maximum_desired_capacity;
+  }
+
+  return shrink_bytes;
+}
+
+size_t G1HeapSizingPolicy::shrink_amount_after_concurrent_mark() {
+  size_t shrink_bytes = 0;
+  const size_t capacity_after_gc = _g1h->capacity();
+  guarantee(capacity_after_gc >= _g1h->unused_committed_regions_in_bytes(), "sanity");
+
+  const size_t used_after_gc = capacity_after_gc - _g1h->unused_committed_regions_in_bytes();
+  size_t maximum_desired_capacity = target_heap_capacity(used_after_gc, MaxHeapFreeRatio);
+  if (capacity_after_gc > maximum_desired_capacity) {
+    shrink_bytes = capacity_after_gc - maximum_desired_capacity;
+  }
+
+  return shrink_bytes;
 }

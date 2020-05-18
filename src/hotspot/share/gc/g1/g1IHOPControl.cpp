@@ -183,3 +183,8 @@ void G1AdaptiveIHOPControl::send_trace_event(G1NewTracer* tracer) {
                                           _predictor->get_new_prediction(&_marking_times_s),
                                           have_enough_data_for_prediction());
 }
+
+size_t G1AdaptiveIHOPControl::predict_unrestrained_buffer_size() const {
+// Besides the young size, the promotion bytes of Prepare Mixed and 1st Mixed GC will be counted
+  return  _last_unrestrained_young_size + _last_allocated_bytes * 2;
+}

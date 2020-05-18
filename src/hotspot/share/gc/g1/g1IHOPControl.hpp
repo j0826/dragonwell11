@@ -77,6 +77,8 @@ class G1IHOPControl : public CHeapObj<mtGC> {
 
   virtual void print();
   virtual void send_trace_event(G1NewTracer* tracer);
+
+  virtual size_t predict_unrestrained_buffer_size() const { return 0; }
 };
 
 // The returned concurrent mark starting occupancy threshold is a fixed value
@@ -144,6 +146,8 @@ class G1AdaptiveIHOPControl : public G1IHOPControl {
 
   virtual void print();
   virtual void send_trace_event(G1NewTracer* tracer);
+
+  virtual size_t predict_unrestrained_buffer_size() const;
 };
 
 #endif // SHARE_VM_GC_G1_G1IHOPCONTROL_HPP

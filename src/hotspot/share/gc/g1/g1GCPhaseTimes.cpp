@@ -127,7 +127,7 @@ void G1GCPhaseTimes::reset() {
   _cur_resize_tlab_time_ms = 0.0;
   _cur_derived_pointer_table_update_time_ms = 0.0;
   _cur_clear_ct_time_ms = 0.0;
-  _cur_expand_heap_time_ms = 0.0;
+  _cur_resize_heap_time_ms = 0.0;
   _cur_ref_proc_time_ms = 0.0;
   _cur_weak_ref_proc_time_ms = 0.0;
   _cur_collection_start_sec = 0.0;
@@ -388,7 +388,7 @@ double G1GCPhaseTimes::print_post_evacuate_collection_set() const {
                         _recorded_redirty_logged_cards_time_ms +
                         _recorded_total_free_cset_time_ms +
                         _cur_fast_reclaim_humongous_time_ms +
-                        _cur_expand_heap_time_ms +
+                        _cur_resize_heap_time_ms +
                         _cur_string_dedup_fixup_time_ms;
 
   info_time("Post Evacuate Collection Set", sum_ms);
@@ -436,7 +436,7 @@ double G1GCPhaseTimes::print_post_evacuate_collection_set() const {
   if (UseTLAB && ResizeTLAB) {
     debug_time("Resize TLABs", _cur_resize_tlab_time_ms);
   }
-  debug_time("Expand Heap After Collection", _cur_expand_heap_time_ms);
+  debug_time("Resize Heap After Collection", _cur_resize_heap_time_ms);
 
 
   return sum_ms;
