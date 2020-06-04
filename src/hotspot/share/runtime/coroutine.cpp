@@ -1001,19 +1001,17 @@ void Coroutine::after_safepoint(JavaThread* thread) {
   assert(thread->thread_state() == origin_thread_state, "illegal thread state");
   coroutine->_is_yielding = false;
 
-  if (thread->has_pending_exception() 
-    && (thread->pending_exception()->klass() == SystemDictionary::OutOfMemoryError_klass()
-      || thread->pending_exception()->klass() == SystemDictionary::StackOverflowError_klass())) {
-      // throw expected vm error
-      return;
-  }
-
-  if (thread->has_pending_exception() || thread->has_async_condition()) {
-    guarantee((MultiTenant && TenantThreadStop && thread->has_tenant_death_exception()) ||
-            thread->pending_exception()->klass() == SystemDictionary::ThreadDeath_klass(),
-        "tenant_death_exception expected");
+  if (thread->has_pending_exception()) {
+    guarantee(thread->pending_exception()->klass() == SystemDictionary::OutOfMemoryError_klass() ||
+      thread->pending_exception()->klass() == SystemDictionary::StackOverflowError_klass() ||
+      (MultiTenant && TenantThreadStop && thread->pending_exception() == Universe::tenant_death_exception()) ||
+      thread->pending_exception()->klass() == SystemDictionary::ThreadDeath_klass(),
+      "Only SOF/OOM/ThreadDeath/TenantDeath happens here");
+    // If it's a SOF / OOM / ThreadDeath / TenantDeath exception, we'd clear it
+    // because polling page stub shouldn't have a pending exception.
     thread->clear_pending_exception();
   }
+
 }
 
 EnableStealMark::EnableStealMark(Thread* thread) {
