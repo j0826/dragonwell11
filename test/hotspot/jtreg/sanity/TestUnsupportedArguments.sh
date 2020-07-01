@@ -4,7 +4,7 @@
 
 JAVA=${TESTJAVA}/bin/java
 echo "$JAVA"
-ILLEGAL_OPTS=('-XX:+UseVectorAPI' '-XX:+UseWisp2' '-XX:+UseVectorAPI' '-XX:+MultiTenant' '-XX:+EnableCoroutine' '-XX:+PrintThreadCoroutineInfo' '-XX:+EagerAppCDS' '-XX:-PromoteAOTtoFullProfile')
+ILLEGAL_OPTS=('-XX:+UseVectorAPI' '-XX:+UseWisp2' '-XX:+UseVectorAPI' '-XX:+EnableCoroutine' '-XX:+PrintThreadCoroutineInfo' '-XX:+EagerAppCDS' '-XX:-PromoteAOTtoFullProfile')
 
 case `uname -m` in
   x86_64)
