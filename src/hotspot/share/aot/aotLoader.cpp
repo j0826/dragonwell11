@@ -128,9 +128,9 @@ void AOTLoader::initialize() {
       return;
     }
 
-    if (JvmtiExport::can_hotswap_or_post_breakpoint()) {
+    if (JvmtiExport::can_post_breakpoint()) {
       if (PrintAOT) {
-        warning("JVMTI capability to hotswap and post breakpoint is not compatible with AOT (switching AOT off)");
+        warning("JVMTI capability to post breakpoint is not compatible with AOT (switching AOT off)");
       }
       FLAG_SET_DEFAULT(UseAOT, false);
       return;

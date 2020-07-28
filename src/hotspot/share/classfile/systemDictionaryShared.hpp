@@ -180,7 +180,6 @@ public:
                                                            int clsfile_crc32) const;
 
   SharedDictionaryEntry* find_entry_for(Klass* klass);
-  void finalize_verification_constraints();
 
   void add_non_builtin_klass(const Symbol* class_name,
                              ClassLoaderData* loader_data,
@@ -294,7 +293,7 @@ private:
                                  Handle class_loader,
                                  Handle protection_domain,
                                  TRAPS);
-
+  static void finalize_verification_constraints_for(InstanceKlass* k);
 public:
   // Called by PLATFORM/APP loader only
   static InstanceKlass* find_or_load_shared_class(Symbol* class_name,
