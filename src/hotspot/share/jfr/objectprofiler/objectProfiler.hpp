@@ -57,7 +57,7 @@
 
 class ObjectProfiler : public AllStatic {
  private:
-  static volatile jint _enabled;
+  static volatile int _enabled;
   static bool _sample_instance_obj_alloc;
   static bool _sample_array_obj_alloc;
 #ifndef PRODUCT
