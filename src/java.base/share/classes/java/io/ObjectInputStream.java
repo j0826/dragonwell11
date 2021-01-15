@@ -305,6 +305,24 @@ public class ObjectInputStream
             Logger filterLog = System.getLogger("java.io.serialization");
             filterLogger = (filterLog.isLoggable(Logger.Level.DEBUG)
                     || filterLog.isLoggable(Logger.Level.TRACE)) ? filterLog : null;
+                    
+        }
+
+        /*
+         * Logger for FastSerializer.
+         * Setup the FastSerializer logger if it is set to DEBUG.
+         * (Assuming it will not change).
+         */
+        static final System.Logger fastSerLogger;
+
+        static {
+            if (printFastSerializer) {
+                Logger fastSerLog = System.getLogger("fastSerializer");
+                fastSerLogger = (fastSerLog.isLoggable(Logger.Level.DEBUG))
+                        ? fastSerLog : null;
+            } else {
+                fastSerLogger = null;
+            }
         }
     }
 
@@ -331,6 +349,9 @@ public class ObjectInputStream
     /** if true, invoke resolveObject() */
     private boolean enableResolve;
 
+     /** Used to get the commandline option: useFastSerializer */
+     private static final Unsafe UNSAFE = Unsafe.getUnsafe();
+
     /**
      * Context during upcalls to class-defined readObject methods; holds
      * object currently being deserialized and descriptor for current class.
@@ -343,6 +364,44 @@ public class ObjectInputStream
      * may be null.
      */
     private ObjectInputFilter serialFilter;
+
+     /**
+     * value of "useFastSerializer" property
+     */
+    private static final boolean defaultFastSerializer = UNSAFE.getUseFastSerializer();
+
+    /**
+     *  true or false for open FastSerilizer
+     *  May be changed in readStreamHeader
+     */
+    private boolean useFastSerializer = defaultFastSerializer;
+
+    /**
+     * Value of "fastSerializerEscapeMode" property. It can be turned on
+     * when useFastSerializer is true.
+     */
+    private static final boolean fastSerializerEscapeMode = java.security.AccessController.doPrivileged(
+            new sun.security.action.GetBooleanAction(
+                    "fastSerializerEscapeMode")).booleanValue();
+
+    /**
+     *  value of  "printFastSerializer" property,
+     *  as true or false for printing FastSerializer logs.
+     */
+    private static final boolean printFastSerializer = java.security.AccessController.doPrivileged(
+            new sun.security.action.GetBooleanAction(
+                    "printFastSerializer")).booleanValue();
+
+    /**
+     * Magic number that is written to the stream header when using fastserilizer.
+     */
+    private static final short STREAM_MAGIC_FAST = (short)0xdeca;
+
+    /**
+    * Cache the class meta during serialization.
+    * Only used in FastSerilizer.
+    */
+   private static ConcurrentHashMap<String,Class<?>> nameToClass = new ConcurrentHashMap<>();
 
     /**
      * Creates an ObjectInputStream that reads from the specified InputStream.
@@ -752,16 +811,29 @@ public class ObjectInputStream
         throws IOException, ClassNotFoundException
     {
         String name = desc.getName();
-        try {
-            return Class.forName(name, false, latestUserDefinedLoader());
-        } catch (ClassNotFoundException ex) {
-            Class<?> cl = primClasses.get(name);
+        Class<?> cl = null;
+
+        if (useFastSerializer) {
+            cl = nameToClass.get(name);
             if (cl != null) {
                 return cl;
-            } else {
+            }
+        }
+
+        try {
+            cl = Class.forName(name, false, latestUserDefinedLoader());
+        } catch (ClassNotFoundException ex) {
+            cl = primClasses.get(name);
+            if (cl == null) {
                 throw ex;
             }
         }
+
+        if (useFastSerializer) {
+            nameToClass.put(name, cl);
+        }
+
+        return cl;
     }
 
     /**
@@ -935,9 +1007,33 @@ public class ObjectInputStream
     {
         short s0 = bin.readShort();
         short s1 = bin.readShort();
-        if (s0 != STREAM_MAGIC || s1 != STREAM_VERSION) {
-            throw new StreamCorruptedException(
-                String.format("invalid stream header: %04X%04X", s0, s1));
+        if (useFastSerializer) {
+            if (s0 != STREAM_MAGIC_FAST || s1 != STREAM_VERSION) {
+                if (s0 != STREAM_MAGIC) {
+                    throw new StreamCorruptedException(
+                            String.format("invalid stream header: %04X%04X, and FastSerializer is activated", s0, s1));
+                }
+
+                if (!fastSerializerEscapeMode) {
+                    throw new StreamCorruptedException(
+                            String.format("invalid stream header: %04X%04X.Fast serialization does not support " +
+                                          "original serialized files", s0, s1));
+                }
+
+                // Escape to default serialization
+                useFastSerializer = false;
+                if (Logging.fastSerLogger != null) {
+                    Logging.fastSerLogger.log(Logger.Level.DEBUG, "[Deserialize]: Escape and disable FastSerializer");
+                }
+            }
+        } else if (s0 != STREAM_MAGIC || s1 != STREAM_VERSION) {
+            if (s0 == STREAM_MAGIC_FAST && s1 == STREAM_VERSION) {
+                throw new StreamCorruptedException(
+                        String.format("invalid stream header: %04X%04X, and it is a FastSerializer stream", s0, s1));
+            } else {
+                throw new StreamCorruptedException(
+                        String.format("invalid stream header: %04X%04X", s0, s1));
+            }
         }
     }
 
@@ -961,6 +1057,28 @@ public class ObjectInputStream
     protected ObjectStreamClass readClassDescriptor()
         throws IOException, ClassNotFoundException
     {
+         // fastSerializer
+         if (useFastSerializer) {
+            String name = readUTF();
+            Class<?> cl = null;
+            ObjectStreamClass desc = new ObjectStreamClass(name);
+            try {
+                // In order to match this method, we add an annotateClass method in
+                // writeClassDescriptor.
+                cl = resolveClass(desc);
+            } catch (ClassNotFoundException ex) {
+                // resolveClass is just used to obtain Class which required by lookup method
+                // and it will be called again later, so we don't throw ClassNotFoundException here.
+                return desc;
+            }
+            if (cl != null) {
+                // This desc is localDesc. It may be different from the descriptor
+                // obtained from the stream.
+                desc = ObjectStreamClass.lookup(cl, true);
+            }
+            return desc;
+        }
+
         ObjectStreamClass desc = new ObjectStreamClass();
         desc.readNonProxy(this);
         return desc;
@@ -2006,12 +2124,29 @@ public class ObjectInputStream
 
         skipCustomData();
 
-        try {
-            totalObjectRefs++;
-            depth++;
-            desc.initNonProxy(readDesc, cl, resolveEx, readClassDesc(false));
-        } finally {
-            depth--;
+        totalObjectRefs++;
+        depth++;
+
+        if (useFastSerializer) {
+            desc.initNonProxyFast(readDesc, resolveEx);
+            ObjectStreamClass superDesc = desc.getSuperDesc();
+            long originDepth = depth - 1;
+            // Since desc is obtained from the lookup method, we will lose the depth and
+            // totalObjectRefs of superDesc. So we add a loop here to compute the depth
+            // and objectRef of superDesc.
+            while (superDesc != null && superDesc.forClass() != null) {
+                filterCheck(superDesc.forClass(), -1);
+                superDesc = superDesc.getSuperDesc();
+                totalObjectRefs++;
+                depth++;
+            }
+            depth = originDepth;
+        } else {
+            try {
+                desc.initNonProxy(readDesc, cl, resolveEx, readClassDesc(false));
+            } finally {
+                depth--;
+            }
         }
 
         handles.finish(descHandle);
@@ -2902,8 +3037,6 @@ public class ObjectInputStream
             return totalBytesRead;
         }
     }
-
-    private static final Unsafe UNSAFE = Unsafe.getUnsafe();
 
     /**
      * Performs a "freeze" action, required to adhere to final field semantics.

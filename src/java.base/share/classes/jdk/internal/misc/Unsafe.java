@@ -3704,6 +3704,7 @@ public final class Unsafe {
 
 
 
+    public native boolean getUseFastSerializer();
     private native long allocateMemory0(long bytes);
     private native long reallocateMemory0(long address, long bytes);
     private native void freeMemory0(long address);

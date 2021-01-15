@@ -37,6 +37,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import static java.io.ObjectStreamClass.processQueue;
 import sun.reflect.misc.ReflectUtil;
+import jdk.internal.misc.Unsafe;
+
 
 /**
  * An ObjectOutputStream writes primitive data types and graphs of Java objects
@@ -174,6 +176,25 @@ public class ObjectOutputStream
             new ReferenceQueue<>();
     }
 
+    private static class Logging {
+        /*
+         * Logger for FastSerializer.
+         * Setup the FastSerializer logger if it is set to DEBUG.
+         * (Assuming it will not change).
+         */
+        static final System.Logger fastSerLogger;
+
+        static {
+            if (printFastSerializer) {
+                System.Logger fastSerLog = System.getLogger("fastSerializer");
+                fastSerLogger = (fastSerLog.isLoggable(System.Logger.Level.DEBUG))
+                        ? fastSerLog : null;
+            } else {
+                fastSerLogger = null;
+            }
+        }
+    }
+
     /** filter stream for handling block data conversion */
     private final BlockDataOutputStream bout;
     /** obj -> wire handle map */
@@ -214,6 +235,28 @@ public class ObjectOutputStream
         java.security.AccessController.doPrivileged(
             new sun.security.action.GetBooleanAction(
                 "sun.io.serialization.extendedDebugInfo")).booleanValue();
+
+    
+   private static final Unsafe UNSAFE = Unsafe.getUnsafe();
+
+    /**
+     * Value of "UseFastSerializer" property, The fastSerializer is turned
+     * on when it is true.
+     */
+    private static final boolean useFastSerializer = UNSAFE.getUseFastSerializer();
+
+    /**
+     *  value of  "printFastSerializer" property,
+     *  as true or false for printing FastSerializer logs.
+     */
+    private static final boolean printFastSerializer = java.security.AccessController.doPrivileged(
+            new sun.security.action.GetBooleanAction(
+                    "printFastSerializer")).booleanValue();
+
+    /**
+     * Magic number that is written to the stream header when using fastserilizer.
+     */
+    private static final short STREAM_MAGIC_FAST = (short)0xdeca; 
 
     /**
      * Creates an ObjectOutputStream that writes to the specified OutputStream.
@@ -636,7 +679,11 @@ public class ObjectOutputStream
      *          stream
      */
     protected void writeStreamHeader() throws IOException {
-        bout.writeShort(STREAM_MAGIC);
+        if (useFastSerializer) {
+            bout.writeShort(STREAM_MAGIC_FAST);
+        } else {
+            bout.writeShort(STREAM_MAGIC);
+        }
         bout.writeShort(STREAM_VERSION);
     }
 
@@ -668,7 +715,14 @@ public class ObjectOutputStream
     protected void writeClassDescriptor(ObjectStreamClass desc)
         throws IOException
     {
-        desc.writeNonProxy(this);
+        if (useFastSerializer) {
+            writeUTF(desc.getName());
+            // The annotateClass is used to match the resolveClass called in
+            // readClassDescriptor.
+            annotateClass(desc.forClass());
+        } else {
+            desc.writeNonProxy(this);
+        }
     }
 
     /**
@@ -1278,7 +1332,13 @@ public class ObjectOutputStream
 
         if (protocol == PROTOCOL_VERSION_1) {
             // do not invoke class descriptor write hook with old protocol
-            desc.writeNonProxy(this);
+            if (useFastSerializer) {
+                // only write name and annotate class when using FastSerializer
+                writeUTF(desc.getName());
+                annotateClass(desc.forClass());
+            } else {
+                desc.writeNonProxy(this);
+            }
         } else {
             writeClassDescriptor(desc);
         }
@@ -1292,7 +1352,9 @@ public class ObjectOutputStream
         bout.setBlockDataMode(false);
         bout.writeByte(TC_ENDBLOCKDATA);
 
-        writeClassDesc(desc.getSuperDesc(), false);
+        if (!useFastSerializer) {
+            writeClassDesc(desc.getSuperDesc(), false);
+        }
     }
 
     /**

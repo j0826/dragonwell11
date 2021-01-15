@@ -270,6 +270,67 @@ public class ObjectStreamClass implements Serializable {
         return suid.longValue();
     }
 
+    byte getFlags(Object serialStream) {
+        byte flags = 0;
+        if (externalizable) {
+            flags |= ObjectStreamConstants.SC_EXTERNALIZABLE;
+            if (serialStream instanceof ObjectOutputStream) {
+                int protocol = ((ObjectOutputStream)serialStream).getProtocolVersion();
+                if (protocol != ObjectStreamConstants.PROTOCOL_VERSION_1) {
+                    flags |= ObjectStreamConstants.SC_BLOCK_DATA;
+                }
+            } else if (serialStream instanceof ObjectInputStream) {
+                flags |= ObjectStreamConstants.SC_BLOCK_DATA;
+            }
+        } else if (serializable) {
+            flags |= ObjectStreamConstants.SC_SERIALIZABLE;
+        }
+        if (hasWriteObjectData) {
+            flags |= ObjectStreamConstants.SC_WRITE_METHOD;
+        }
+        if (isEnum) {
+            flags |= ObjectStreamConstants.SC_ENUM;
+        }
+        return flags;
+    }
+
+    ObjectStreamClass(String name) {
+        this.name  = name;
+    }
+
+    void initNonProxyFast(ObjectStreamClass model,
+        ClassNotFoundException resolveEx) {
+    this.cl = model.cl;
+    this.resolveEx = resolveEx;
+    this.superDesc = model.superDesc;
+    name = model.name;
+    this.suid = model.suid;
+    isProxy = false;
+    isEnum = model.isEnum;
+    serializable = model.serializable;
+    externalizable = model.externalizable;
+    hasBlockExternalData = model.hasBlockExternalData;
+    hasWriteObjectData = model.hasWriteObjectData;
+    fields = model.fields;
+    primDataSize = model.primDataSize;
+    numObjFields = model.numObjFields;
+
+    writeObjectMethod = model.writeObjectMethod;
+    readObjectMethod = model.readObjectMethod;
+    readObjectNoDataMethod = model.readObjectNoDataMethod;
+    writeReplaceMethod = model.writeReplaceMethod;
+    readResolveMethod = model.readResolveMethod;
+    if (deserializeEx == null) {
+    deserializeEx = model.deserializeEx;
+    }
+    domains = model.domains;
+    cons = model.cons;
+    fieldRefl = model.fieldRefl;
+    localDesc = model;
+
+    initialized = true;
+    }
+
     /**
      * Return the class in the local VM that this version is mapped to.  Null
      * is returned if there is no corresponding local class.
