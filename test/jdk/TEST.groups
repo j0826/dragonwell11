@@ -507,4 +507,3 @@ needs_g1gc = \
 dragonwell_jdk = \
   :jdk_jfr_sanity \
   com/alibaba
-  jdk/jfr/event
