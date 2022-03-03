@@ -8,11 +8,11 @@
 ##
 
 
-export LD_LIBRARY_PATH=.:${TEST_IMAGE_DIR}/lib/server:/usr/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=.:${TESTJAVA}/lib/server:/usr/lib:$LD_LIBRARY_PATH
 
 g++ -DLINUX -o testJniDetachThreadHoldingMonitor \
-    -I${TEST_IMAGE_DIR}/include -I${TEST_IMAGE_DIR}/include/linux \
-    -L${TEST_IMAGE_DIR}/lib/server \
+    -I${TESTJAVA}/include -I${TESTJAVA}/include/linux \
+    -L${TESTJAVA}/lib/server \
     -ljvm -lpthread ${TESTSRC}/testJniDetachThreadHoldingMonitor.c
 
 ./testJniDetachThreadHoldingMonitor
