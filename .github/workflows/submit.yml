@@ -333,7 +333,7 @@ jobs:
 
       - name: Configure bash as default
         run: |
-          chsh -s /bin/bash $(whoami)
+          sudo chsh -s /bin/bash $(whoami)
 
 
       - name: Run tests
