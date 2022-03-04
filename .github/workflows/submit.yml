@@ -331,9 +331,13 @@ jobs:
           imageroot=`find ${HOME}/jdk-linux-x64${{ matrix.artifact }}/jdk-${{ env.JDK_VERSION }}-internal+0_linux-x64_bin${{ matrix.artifact }} -name release -type f`
           echo "imageroot=`dirname ${imageroot}`" >> $GITHUB_ENV
 
+      - name: Configure bash as default
+        run: |
+          chsh -s /bin/bash $(whoami)
+
+
       - name: Run tests
         run: >
-          sudo dpkg-reconfigure dash
           JDK_IMAGE_DIR=${{ env.imageroot }}
           TEST_IMAGE_DIR=${HOME}/jdk-linux-x64${{ matrix.artifact }}/jdk-${{ env.JDK_VERSION }}-internal+0_linux-x64_bin-tests${{ matrix.artifact }}
           BOOT_JDK=${HOME}/bootjdk/${BOOT_JDK_VERSION}
