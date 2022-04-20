@@ -39,6 +39,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 import java.util.function.Supplier;
 
+import static com.alibaba.wisp.engine.WispTask.Status.CACHED;
+
 /**
  * Coroutine Runtime Engine. It's a "wisp" thing, as we want our asynchronization transformation to be transparent
  * without any modification to user code.
@@ -342,6 +344,27 @@ public class WispEngine extends AbstractExecutorService {
             public StackTraceElement[] getStackTrace(WispTask task) {
                 return task.getStackTrace();
             }
+
+            @Override
+            public WispTask fromThreadId(long id) {
+                return WispTask.fromThreadId(id);
+            }
+
+            @Override
+            public Thread.State getState(Thread thread) {
+                WispTask task = JLA.getWispTask(thread);
+                if (task == null) {
+                    return Thread.State.NEW;
+                } else if (WispTask.JVM_PARK_UPDATER.get(task) == WispTask.WAITING) {
+                    return Thread.State.BLOCKED;
+                } else if (task.timeOut != null && !task.timeOut.canceled) {
+                    return Thread.State.TIMED_WAITING;
+                } else if (WispTask.JDK_PARK_UPDATER.get(task) == WispTask.WAITING) {
+                    return Thread.State.WAITING;
+                } else {
+                    return task.status == CACHED ? Thread.State.TERMINATED : Thread.State.RUNNABLE;
+                }
+            }
         });
     }
 
@@ -556,7 +579,6 @@ public class WispEngine extends AbstractExecutorService {
             wispControlGroup.destroyLatch.countDown();
         }
     }
-
 
 
     /**
