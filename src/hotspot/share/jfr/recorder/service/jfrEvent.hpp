@@ -32,6 +32,7 @@
 #include "jfr/utilities/jfrTypes.hpp"
 #include "jfr/writers/jfrNativeEventWriter.hpp"
 #include "runtime/thread.hpp"
+#include "jfr/support/jfrThreadId.hpp"
 #include "utilities/exceptions.hpp"
 #include "utilities/ticks.hpp"
 #ifdef ASSERT
@@ -170,7 +171,7 @@ class JfrEvent {
       writer.write(_end_time - _start_time);
     }
     if (T::hasThread) {
-      writer.write(tl->thread_id());
+      writer.write(JFR_THREAD_ID(event_thread));
     }
     if (T::hasStackTrace) {
       if (is_stacktrace_enabled()) {

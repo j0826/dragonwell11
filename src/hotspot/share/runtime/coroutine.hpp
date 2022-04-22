@@ -465,10 +465,16 @@ public:
   static int get_proxy_unpark(jintArray res);
 
   static WispThread* current(Thread* thread) {
-    assert(thread->is_Java_thread(), "invariant") ;
-    return thread->is_Wisp_thread() ? (WispThread*) thread : 
-      ((JavaThread*) thread)->current_coroutine()->wisp_thread();
+    return current((const Thread*)thread);
   }
+
+  static WispThread* current(const Thread* thread) {
+    assert(thread->is_Java_thread(), "invariant") ;
+    return thread->is_Wisp_thread() ? (WispThread*) thread :
+        ((JavaThread*) thread)->current_coroutine()->wisp_thread();
+  }
+
+  const char* threadwrapper_name() const;
 };
 
 // we supported coroutine stealing for following native calls:

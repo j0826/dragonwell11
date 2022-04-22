@@ -31,7 +31,9 @@
 #if INCLUDE_JFR
 #include "jfr/support/jfrThreadLocal.hpp"
 #include "jfr/utilities/jfrTypes.hpp"
-#define JFR_THREAD_ID(thread) ((thread)->jfr_thread_local()->thread_id())
+#include "runtime/coroutine.hpp"
+#define JFR_THREAD_ID(thread) (UseWispMonitor && thread->is_Java_thread() && !WispThread::current(thread)->coroutine()->is_thread_coroutine() ?\
+  (WispThread::current(thread))->jfr_thread_local()->thread_id() : (thread)->jfr_thread_local()->thread_id())
 #else
 typedef u8 traceid;
 #define JFR_THREAD_ID(thread) ((traceid)(thread)->osthread()->thread_id())

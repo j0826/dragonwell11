@@ -991,6 +991,23 @@ const char* WispThread::print_blocking_status(int status) {
   }
 }
 
+const char* WispThread::threadwrapper_name() const {
+  const char* name_str;
+  oop thread_obj = com_alibaba_wisp_engine_WispTask::get_threadWrapper(_coroutine->wisp_task());
+  if (thread_obj != NULL) {
+    oop name = java_lang_Thread::name(thread_obj);
+    if (name != NULL) {
+      name_str = java_lang_String::as_utf8_string(name);
+    } else {
+      name_str = Thread::name();
+    }
+  } else {
+    name_str = Thread::name();
+  }
+  assert(name_str != NULL, "unexpected NULL thread name");
+  return name_str;
+}
+
 void Coroutine::after_safepoint(JavaThread* thread) {
   assert(Thread::current() == thread, "sanity check");
 

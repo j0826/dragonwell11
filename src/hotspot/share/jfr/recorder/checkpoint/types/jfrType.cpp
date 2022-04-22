@@ -49,6 +49,7 @@
 #include "runtime/synchronizer.hpp"
 #include "runtime/thread.inline.hpp"
 #include "runtime/vmOperations.hpp"
+#include "runtime/coroutine.hpp"
 
 #ifdef COMPILER2
 #include "opto/compile.hpp"
@@ -82,6 +83,7 @@ class JfrCheckpointThreadClosure : public ThreadClosure {
   }
 
   void do_thread(Thread* t);
+  void do_wisp_thread(WispThread* thread);
 };
 
 // Requires a ResourceMark for get_thread_name/as_utf8
@@ -105,11 +107,48 @@ void JfrCheckpointThreadClosure::do_thread(Thread* t) {
     _writer.write(JfrThreadGroup::thread_group_id(jt, _curthread));
     // since we are iterating threads during a safepoint, also issue notification
     JfrJavaEventWriter::notify(jt);
+    if (UseWispMonitor) {
+      if (jt->coroutine_list()) {
+        Coroutine* c = jt->coroutine_list();
+        do {
+          do_wisp_thread(c->wisp_thread());
+          c = c->next();
+        } while (c != jt->coroutine_list());
+      }
+    }
     return;
   }
   _writer.write((const char*)NULL); // java name
   _writer.write((traceid)0); // java thread id
   _writer.write((traceid)0); // java thread group
+}
+
+
+void JfrCheckpointThreadClosure::do_wisp_thread(WispThread* thread) {
+  assert(thread != NULL, "invariant");
+  assert(thread->is_Wisp_thread(), "must be wisp");
+  assert(UseWispMonitor, "wisp enabled");
+  assert(thread->jfr_thread_local() != NULL, "thread local initialized");
+  if (thread->coroutine()->is_thread_coroutine()) {
+    return;
+  }
+  assert(thread->coroutine()->wisp_task() != NULL, "wisp task not null");
+  oop thread_obj = com_alibaba_wisp_engine_WispTask::get_threadWrapper(thread->coroutine()->wisp_task());
+  const JfrThreadLocal* const tl = thread->jfr_thread_local();
+  ++_count;
+  _writer.write_key(tl->thread_id());
+  _writer.write(thread->name());
+  const OSThread* const os_thread = thread->osthread();
+  _writer.write<traceid>(os_thread != NULL ? os_thread->thread_id() : 0);
+  _writer.write(thread->threadwrapper_name());
+  assert(thread->coroutine()->wisp_task() != NULL, "wisp task not null");
+  if (thread_obj == NULL) {
+    _writer.write(java_lang_Thread::thread_id(thread->thread()->threadObj()));
+  } else {
+    _writer.write(java_lang_Thread::thread_id(thread_obj));
+  }
+  _writer.write((traceid)0); // skip thread group id
+  JfrJavaEventWriter::notify(thread);
 }
 
 void JfrThreadConstantSet::serialize(JfrCheckpointWriter& writer) {
