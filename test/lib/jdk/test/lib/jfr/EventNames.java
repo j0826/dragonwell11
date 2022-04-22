@@ -59,6 +59,7 @@ public class EventNames {
     public final static String ThreadEnd = PREFIX + "ThreadEnd";
     public final static String ThreadSleep = PREFIX + "ThreadSleep";
     public final static String ThreadPark = PREFIX + "ThreadPark";
+    public final static String WispThreadPark = PREFIX + "WispThreadPark";
     public final static String JavaMonitorEnter = PREFIX + "JavaMonitorEnter";
     public final static String JavaMonitorWait = PREFIX + "JavaMonitorWait";
     public final static String JavaMonitorInflate = PREFIX + "JavaMonitorInflate";
